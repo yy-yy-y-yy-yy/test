@@ -158,6 +158,17 @@
   }
   .count-btn:hover:not(.selected) { background: var(--card); color: var(--text); }
 
+  /* ── Category grid ───────────────────────── */
+  .category-group {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 4px;
+  }
+  .category-group .count-btn:first-child {
+    grid-column: 1 / -1;
+  }
+
   /* ── Progress bar ────────────────────────── */
   .progress-wrap {
     background: var(--surface);
@@ -393,11 +404,6 @@
   .spacer { flex: 1; }
   .mt-16 { margin-top: 16px; }
   .mt-8  { margin-top: 8px; }
-  .separator {
-    border: none;
-    border-top: 1px solid var(--border);
-    margin: 20px 0;
-  }
 
   @media (max-width: 460px) {
     .choices { grid-template-columns: 1fr; }
@@ -408,7 +414,6 @@
 <body>
 <div class="app">
 
-  <!-- ══════════════════ SCREEN: HOME ══════════════════ -->
   <div class="screen active" id="screen-home">
     <div class="app-header">
       <h1>英単語テスト</h1>
@@ -416,7 +421,18 @@
     </div>
 
     <div class="card">
-      <div class="card-title">問題の種類</div>
+      <div class="card-title">単語帳（カテゴリ）を選ぶ</div>
+      <div class="category-group" id="book-group">
+        <button class="count-btn selected" data-book="book1">Lv.1</button>
+        <button class="count-btn" data-book="book2">Lv.5</button>
+        <button class="count-btn" data-book="book3">Lv.10</button>
+        <button class="count-btn" data-book="book4">Lv.20</button>
+        <button class="count-btn" data-book="book5">Lv.30</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">出題形式</div>
       <div class="count-group" id="type-group">
         <button class="count-btn selected" data-type="fill">①　日 → 英<br><span style="font-size:.75rem;font-weight:400;color:var(--muted)">日本語を見て英単語を入力</span></button>
         <button class="count-btn" data-type="choice">②　英 → 日<br><span style="font-size:.75rem;font-weight:400;color:var(--muted)">英単語を見て4択から選ぶ</span></button>
@@ -436,19 +452,18 @@
     </div>
 
     <div class="card">
-      <div class="card-title">単語リスト</div>
+      <div class="card-title">選択中の単語リスト</div>
       <p style="color:var(--muted);font-size:.88rem;margin-bottom:16px;">
         単語の追加・編集はブラウザ内でできます。<br>
-        永続保存はHTMLファイルをテキストエディタで開き、<code style="background:var(--surface);padding:1px 5px;border-radius:4px;color:var(--accent)">WORD_LIST</code> 配列を直接編集してください。
+        永続保存はHTMLファイルをテキストエディタで開き、<code style="background:var(--surface);padding:1px 5px;border-radius:4px;color:var(--accent)">WORD_BOOKS</code> オブジェクトを直接編集してください。
       </p>
       <button class="btn-accent2" id="btn-edit">単語リストを編集する</button>
     </div>
   </div>
 
-  <!-- ══════════════════ SCREEN: EDITOR ══════════════════ -->
   <div class="screen" id="screen-editor">
     <div class="app-header">
-      <h1>単語リスト</h1>
+      <h1 id="editor-title">単語リスト</h1>
       <p>クリックして直接編集できます（今のセッションのみ有効）</p>
     </div>
 
@@ -474,7 +489,6 @@
     </div>
   </div>
 
-  <!-- ══════════════════ SCREEN: QUIZ ══════════════════ -->
   <div class="screen" id="screen-quiz">
     <div class="app-header">
       <h1>英単語テスト</h1>
@@ -494,12 +508,10 @@
       <div class="q-word"   id="q-word"></div>
       <div class="q-hint"   id="q-hint"></div>
 
-      <!-- Fill-in (JP→EN) -->
       <div id="fill-area" style="display:none">
         <input class="fill-input" id="fill-input" type="text" placeholder="英語で入力…" autocomplete="off" autocorrect="off" spellcheck="false">
       </div>
 
-      <!-- Choices (EN→JP) -->
       <div class="choices" id="choices-area" style="display:none">
         <button class="choice-btn" id="c0"></button>
         <button class="choice-btn" id="c1"></button>
@@ -511,7 +523,6 @@
       <button class="btn-next" id="btn-next">次へ →</button>
     </div>
 
-    <!-- Submit (fill-in) -->
     <div id="submit-area">
       <button class="btn-primary" id="btn-submit" style="display:none">答え合わせ</button>
     </div>
@@ -521,7 +532,6 @@
     </div>
   </div>
 
-  <!-- ══════════════════ SCREEN: RESULTS ══════════════════ -->
   <div class="screen" id="screen-results">
     <div class="app-header">
       <h1>結果発表</h1>
@@ -552,107 +562,683 @@
 
 </div>
 
-<!-- Toast -->
 <div id="toast"></div>
 
 <script>
 /* ═══════════════════════════════════════════════════════════
-   WORD_LIST  ← ここに単語を追加・編集してください
-   形式: { en: "英単語", ja: "日本語の意味" }
+   WORD_BOOKS  ← 5つの単語帳をここで管理・編集できます
    ═══════════════════════════════════════════════════════════ */
-const WORD_LIST = [
-  { en: "abandon",      ja: "捨てる、放棄する" },
-  { en: "abundant",     ja: "豊富な、たくさんの" },
-  { en: "acknowledge",  ja: "認める、認識する" },
-  { en: "acquire",      ja: "取得する、習得する" },
-  { en: "advocate",     ja: "支持者、擁護する" },
-  { en: "ambiguous",    ja: "曖昧な、多義的な" },
-  { en: "analyze",      ja: "分析する" },
-  { en: "anticipate",   ja: "予期する、見越す" },
-  { en: "apparent",     ja: "明らかな、見かけ上の" },
-  { en: "approach",     ja: "アプローチ、近づく" },
-  { en: "assess",       ja: "評価する、査定する" },
-  { en: "assumption",   ja: "仮定、思い込み" },
-  { en: "benefit",      ja: "利益、恩恵" },
-  { en: "category",     ja: "カテゴリー、範疇" },
-  { en: "cognitive",    ja: "認知の、認知的な" },
-  { en: "collaborate",  ja: "共同作業する、協力する" },
-  { en: "compensate",   ja: "補償する、埋め合わせる" },
-  { en: "comprehensive","ja": "包括的な、総合的な" },
-  { en: "confirm",      ja: "確認する、確かめる" },
-  { en: "consistent",   ja: "一貫した、整合性のある" },
-  { en: "contribute",   ja: "貢献する、寄与する" },
-  { en: "controversial", ja: "物議を醸す、議論を呼ぶ" },
-  { en: "convenient",   ja: "便利な、都合のよい" },
-  { en: "crucial",      ja: "非常に重要な、決定的な" },
-  { en: "dedicate",     ja: "捧げる、専念する" },
-  { en: "demonstrate",  ja: "実証する、示す" },
-  { en: "diagnose",     ja: "診断する" },
-  { en: "discipline",   ja: "規律、学問分野" },
-  { en: "diverse",      ja: "多様な" },
-  { en: "efficient",    ja: "効率的な" },
-  { en: "eliminate",    ja: "排除する、取り除く" },
-  { en: "emphasize",    ja: "強調する" },
-  { en: "enforce",      ja: "施行する、強制する" },
-  { en: "establish",    ja: "設立する、確立する" },
-  { en: "evaluate",     ja: "評価する、査定する" },
-  { en: "evident",      ja: "明らかな、明白な" },
-  { en: "evolve",       ja: "進化する、発展する" },
-  { en: "facilitate",   ja: "促進する、容易にする" },
-  { en: "factor",       ja: "要因、要素" },
-  { en: "flexible",     ja: "柔軟な、融通の利く" },
-  { en: "generate",     ja: "生み出す、発生させる" },
-  { en: "hypothesis",   ja: "仮説" },
-  { en: "implement",    ja: "実施する、実装する" },
-  { en: "indicate",     ja: "示す、指摘する" },
-  { en: "innovative",   ja: "革新的な" },
-  { en: "interpret",    ja: "解釈する" },
-  { en: "investigate",  ja: "調査する、研究する" },
-  { en: "justify",      ja: "正当化する" },
-  { en: "maintain",     ja: "維持する、保つ" },
-  { en: "minimize",     ja: "最小化する" },
-  { en: "monitor",      ja: "監視する、モニタリングする" },
-  { en: "negotiate",    ja: "交渉する" },
-  { en: "objective",    ja: "目標、客観的な" },
-  { en: "observe",      ja: "観察する" },
-  { en: "obtain",       ja: "取得する、入手する" },
-  { en: "obvious",      ja: "明らかな" },
-  { en: "outcome",      ja: "結果、成果" },
-  { en: "perceive",     ja: "認知する、気づく" },
-  { en: "persist",      ja: "持続する、固執する" },
-  { en: "potential",    ja: "潜在的な、可能性" },
-  { en: "precise",      ja: "正確な" },
-  { en: "predict",      ja: "予測する" },
-  { en: "priority",     ja: "優先事項" },
-  { en: "process",      ja: "プロセス、処理する" },
-  { en: "profound",     ja: "深い、重大な" },
-  { en: "promote",      ja: "促進する、昇進させる" },
-  { en: "relevant",     ja: "関連した、適切な" },
-  { en: "require",      ja: "必要とする、要求する" },
-  { en: "resolve",      ja: "解決する、決意する" },
-  { en: "restrict",     ja: "制限する" },
-  { en: "significant",  ja: "重要な、有意な" },
-  { en: "stimulate",    ja: "刺激する、促す" },
-  { en: "strategy",     ja: "戦略" },
-  { en: "substantial",  ja: "相当な、実質的な" },
-  { en: "sufficient",   ja: "十分な" },
-  { en: "summarize",    ja: "要約する" },
-  { en: "supplement",   ja: "補足する、サプリメント" },
-  { en: "survive",      ja: "生き残る" },
-  { en: "transparent",  ja: "透明な、明白な" },
-  { en: "undermine",    ja: "弱体化させる、蝕む" },
-  { en: "validate",     ja: "検証する、有効性を確認する" },
-  { en: "vulnerable",   ja: "脆弱な、傷つきやすい" }
-];
+const WORD_BOOKS = {
+  book1: [
+   { en: "compare", ja: "比べる" }, { en: "correct", ja: "正しい" }, { en: "events", ja: "出来事" }, { en: "half", ja: "半分" }, { en: "long", ja: "長い" }, { en: "question", ja: "質問" }, { en: "sentence", ja: "文" }, { en: "solve", ja: "解く" }, { en: "title", ja: "タイトル" }, { en: "true", ja: "本当の" }, { en: "adjective", ja: "形容詞" }, { en: "attempts", ja: "試み、試みる" }, { en: "describe", ja: "描写する" }, { en: "difference", ja: "違い" }, { en: "habitat", ja: "生息地" }, { en: "passage", ja: "一節、通路" }, { en: "strength", ja: "強さ" }, { en: "struggle", ja: "奮闘する" }, { en: "tally", ja: "記録、集計" }, { en: "vanish", ja: "消える" }, { en: "cause", ja: "原因、引き起こす" }, { en: "collect", ja: "集める" }, { en: "effect", ja: "効果、影響" }, { en: "energy", ja: "エネルギー" }, { en: "fact", ja: "事実" }, { en: "hundred", ja: "百" }, { en: "map", ja: "地図" }, { en: "opinion", ja: "意見" }, { en: "subtract", ja: "引く" }, { en: "sum", ja: "合計" }, { en: "a", ja: "一つの" }, { en: "am", ja: "〜である" }, { en: "and", ja: "〜と" }, { en: "at", ja: "〜に" }, { en: "away", ja: "離れて" }, { en: "be", ja: "〜になる" }, { en: "but", ja: "しかし" }, { en: "can", ja: "〜できる" }, { en: "for", ja: "〜のために" }, { en: "get", ja: "得る" }, { en: "he", ja: "彼は" }, { en: "here", ja: "ここに" }, { en: "I", ja: "私は" }, { en: "if", ja: "もし" }, { en: "in", ja: "〜の中に" }, { en: "is", ja: "〜である" }, { en: "it", ja: "それは" }, { en: "like", ja: "好む、〜のような" }, { en: "make", ja: "作る" }, { en: "me", ja: "私を" }, { en: "my", ja: "私の" }, { en: "no", ja: "いいえ" }, { en: "not", ja: "〜ない" }, { en: "on", ja: "〜の上に" }, { en: "said", ja: "言った" }, { en: "see", ja: "見る" }, { en: "the", ja: "その" }, { en: "to", ja: "〜へ" }, { en: "we", ja: "私たちは" }, { en: "you", ja: "あなたは" }, { en: "baby", ja: "赤ちゃん" }, { en: "big", ja: "大きい" }, { en: "blue", ja: "青" }, { en: "cat", ja: "猫" }, { en: "dog", ja: "犬" }, { en: "down", ja: "下へ" }, { en: "funny", ja: "おかしい" }, { en: "go", ja: "行く" }, { en: "help", ja: "助ける" }, { en: "jump", ja: "跳ぶ" }, { en: "one", ja: "一つ" }, { en: "two", ja: "二つ" }, { en: "little", ja: "小さい" }, { en: "mother", ja: "母" }, { en: "play", ja: "遊ぶ" }, { en: "red", ja: "赤" }, { en: "run", ja: "走る" }, { en: "stop", ja: "止まる" }, { en: "up", ja: "上へ" }, { en: "yellow", ja: "黄色" }, { en: "come", ja: "来る" }, { en: "did", ja: "した" }, { en: "do", ja: "する" }, { en: "find", ja: "見つける" }, { en: "good", ja: "良い" }, { en: "got", ja: "得た" }, { en: "have", ja: "持っている" }, { en: "into", ja: "〜の中へ" }, { en: "must", ja: "〜しなければならない" }, { en: "new", ja: "新しい" }, { en: "our", ja: "私たちの" }, { en: "please", ja: "どうぞ" }, { en: "ran", ja: "走った" }, { en: "saw", ja: "見た" }, { en: "say", ja: "言う" }, { en: "she", ja: "彼女は" }, { en: "so", ja: "だから" }, { en: "soon", ja: "すぐに" }, { en: "that", ja: "あの" }, { en: "they", ja: "彼らは" }, { en: "this", ja: "この" }, { en: "too", ja: "〜もまた、あまりにも" }, { en: "want", ja: "欲しい" }, { en: "was", ja: "〜だった" }, { en: "well", ja: "上手に、さて" }, { en: "went", ja: "行った" }, { en: "what", ja: "何" }, { en: "who", ja: "誰" }, { en: "will", ja: "〜するつもりだ" }, { en: "with", ja: "〜と一緒に" }, { en: "four", ja: "四" }, { en: "add", ja: "加える" }, { en: "ball", ja: "ボール" }, { en: "brown", ja: "茶色" }, { en: "eat", ja: "食べる" }, { en: "father", ja: "父" }, { en: "hot", ja: "熱い" }, { en: "all", ja: "すべての" }, { en: "because", ja: "なぜなら" }, { en: "yes", ja: "はい" }, { en: "black", ja: "黒" }, { en: "girl", ja: "女の子" }, { en: "kitten", ja: "子猫" }, { en: "look", ja: "見る" }, { en: "out", ja: "外へ" }, { en: "pretty", ja: "かわいい" }, { en: "white", ja: "白" }, { en: "an", ja: "一つの" }, { en: "are", ja: "〜である" }, { en: "came", ja: "来た" }, { en: "as", ja: "〜として" }, { en: "ask", ja: "尋ねる" }, { en: "by", ja: "〜のそばに" }, { en: "ever", ja: "これまでに" }, { en: "from", ja: "〜から" }, { en: "going", ja: "行くこと" }, { en: "had", ja: "持っていた" }, { en: "has", ja: "持っている" }, { en: "her", ja: "彼女の" }, { en: "him", ja: "彼を" }, { en: "his", ja: "彼の" }, { en: "just", ja: "ちょうど" }, { en: "less", ja: "より少なく" }, { en: "let", ja: "〜させる" }, { en: "live", ja: "住む、生きる" }, { en: "name", ja: "名前" }, { en: "need", ja: "必要とする" }, { en: "of", ja: "〜の" }, { en: "put", ja: "置く" }, { en: "may", ja: "〜かもしれない" }, { en: "same", ja: "同じ" }, { en: "save", ja: "救う、節約する" }, { en: "some", ja: "いくつかの" }, { en: "still", ja: "まだ" }, { en: "take", ja: "取る" }, { en: "them", ja: "彼らを" }, { en: "then", ja: "それから" }, { en: "there", ja: "そこに" }, { en: "were", ja: "〜だった" }, { en: "would", ja: "〜だろう" }, { en: "boy", ja: "男の子" }, { en: "car", ja: "車" }, { en: "purple", ja: "紫色" }, { en: "feet", ja: "足" }, { en: "fly", ja: "飛ぶ" }, { en: "food", ja: "食べ物" }, { en: "give", ja: "与える" }, { en: "man", ja: "男" }, { en: "old", ja: "古い" }, { en: "after", ja: "〜の後で" }, { en: "six", ja: "六" }, { en: "three", ja: "三" }, { en: "back", ja: "後ろへ" }, { en: "open", ja: "開く" }, { en: "over", ja: "〜を越えて" }, { en: "ride", ja: "乗る" }, { en: "school", ja: "学校" }, { en: "street", ja: "通り" }, { en: "tree", ja: "木" }, { en: "again", ja: "再び" }, { en: "around", ja: "〜の周りに" }, { en: "bed", ja: "ベッド" }, { en: "bird", ja: "鳥" }, { en: "birthday", ja: "誕生日" }, { en: "book", ja: "本" }, { en: "children", ja: "子供たち" }, { en: "cold", ja: "冷たい" }, { en: "door", ja: "ドア" }, { en: "fall", ja: "落ちる、秋" }, { en: "before", ja: "〜の前に" }, { en: "five", ja: "五" }, { en: "fast", ja: "速い" }, { en: "first", ja: "最初の" }, { en: "green", ja: "緑" }, { en: "off", ja: "離れて" }, { en: "pet", ja: "ペット" }, { en: "pull", ja: "引く" }, { en: "read", ja: "読む" }, { en: "sit", ja: "座る" }, { en: "also", ja: "〜もまた" }, { en: "story", ja: "物語" }, { en: "dinner", ja: "夕食" }, { en: "sing", ja: "歌う" }, { en: "sleep", ja: "眠る" }, { en: "under", ja: "〜の下に" }, { en: "wash", ja: "洗う" }, { en: "water", ja: "水" }, { en: "wish", ja: "願う" }, { en: "work", ja: "働く" }, { en: "been", ja: "〜だった" }, { en: "best", ja: "最も良い" }, { en: "call", ja: "呼ぶ" }, { en: "day", ja: "日" }, { en: "gave", ja: "与えた" }, { en: "goes", ja: "行く" }, { en: "how", ja: "どのように" }, { en: "it's", ja: "それは〜である" }, { en: "made", ja: "作った" }, { en: "most", ja: "最も" }, { en: "next", ja: "次の" }, { en: "or", ja: "または" }, { en: "tell", ja: "話す" }, { en: "thank", ja: "感謝する" }, { en: "upon", ja: "〜の上に" }, { en: "us", ja: "私たちを" }, { en: "very", ja: "とても" }, { en: "when", ja: "いつ" }, { en: "which", ja: "どちら" }, { en: "why", ja: "なぜ" }, { en: "word", ja: "単語" }, { en: "animal", ja: "動物" }, { en: "clean", ja: "きれいな、掃除する" }, { en: "cut", ja: "切る" }, { en: "drink", ja: "飲む" }, { en: "far", ja: "遠く" }, { en: "hear", ja: "聞こえる" }, { en: "home", ja: "家" }, { en: "hurt", ja: "傷つける" }, { en: "large", ja: "大きい" }, { en: "night", ja: "夜" }, { en: "right", ja: "正しい、右" }, { en: "seven", ja: "七" }, { en: "small", ja: "小さい" }, { en: "ten", ja: "十" }, { en: "light", ja: "光、軽い" }, { en: "love", ja: "愛する" }, { en: "start", ja: "始める" }, { en: "thing", ja: "物" }, { en: "walk", ja: "歩く" }, { en: "house", ja: "家" }, { en: "about", ja: "〜について" }, { en: "always", ja: "いつも" }, { en: "begin", ja: "始める" }, { en: "below", ja: "〜の下に" }, { en: "better", ja: "より良い" }, { en: "bring", ja: "持ってくる" }, { en: "close", ja: "閉じる、近い" }, { en: "each", ja: "それぞれの" }, { en: "even", ja: "〜でさえ" }, { en: "every", ja: "すべての" }, { en: "feel", ja: "感じる" }, { en: "fin", ja: "ひれ" }, { en: "full", ja: "いっぱいの" }, { en: "hope", ja: "希望" }, { en: "keep", ja: "保つ" }, { en: "many", ja: "たくさんの" }, { en: "more", ja: "もっと" }, { en: "much", ja: "多くの" }, { en: "often", ja: "しばしば" }, { en: "only", ja: "〜だけ" }, { en: "pick", ja: "選ぶ、摘む" }, { en: "seem", ja: "〜のように見える" }, { en: "show", ja: "見せる" }, { en: "such", ja: "そのような" }, { en: "than", ja: "〜よりも" }, { en: "today", ja: "今日" }, { en: "try", ja: "試す" }, { en: "use", ja: "使う" }, { en: "where", ja: "どこ" }, { en: "eight", ja: "八" }, { en: "between", ja: "〜の間に" }, { en: "carry", ja: "運ぶ" }, { en: "circle", ja: "円" }, { en: "draw", ja: "描く" }, { en: "eyes", ja: "目" }, { en: "gray", ja: "灰色" }, { en: "laugh", ja: "笑う" }, { en: "any", ja: "いくらかの" }, { en: "different", ja: "異なる" }, { en: "answer", ja: "答える" }, { en: "morning", ja: "朝" }, { en: "number", ja: "数" }, { en: "party", ja: "パーティー" }, { en: "people", ja: "人々" }, { en: "picture", ja: "写真、絵" }, { en: "round", ja: "丸い" }, { en: "world", ja: "世界" }, { en: "write", ja: "書く" }, { en: "another", ja: "もう一つの" }, { en: "both", ja: "両方の" }, { en: "buy", ja: "買う" }, { en: "could", ja: "〜できた" }, { en: "does", ja: "する" }, { en: "done", ja: "終わった" }, { en: "follow", ja: "従う" }, { en: "found", ja: "見つけた" }, { en: "grow", ja: "成長する" }, { en: "guess", ja: "推測する" }, { en: "hold", ja: "持つ" }, { en: "hurry", ja: "急ぐ" }, { en: "kind", ja: "親切な、種類" }, { en: "know", ja: "知っている" }, { en: "myself", ja: "私自身" }, { en: "never", ja: "決して〜ない" }, { en: "now", ja: "今" }, { en: "once", ja: "一度" }, { en: "other", ja: "他の" }, { en: "own", ja: "自身の" }, { en: "should", ja: "〜すべきである" }, { en: "something", ja: "何か" }, { en: "their", ja: "彼らの" }, { en: "these", ja: "これらの" }, { en: "those", ja: "あれらの" }, { en: "together", ja: "一緒に" }, { en: "until", ja: "〜まで" }, { en: "warm", ja: "暖かい" }, { en: "while", ja: "〜の間" }, { en: "your", ja: "あなたの" }, { en: "orange", ja: "オレンジ色" }, { en: "nine", ja: "九" }, { en: "eleven", ja: "十一" }, { en: "twelve", ja: "十二" }, { en: "thirteen", ja: "十三" }, { en: "fourteen", ja: "十四" }, { en: "fifteen", ja: "十五" }, { en: "sixteen", ja: "十六" }, { en: "seventeen", ja: "十七" }, { en: "eighteen", ja: "十八" }, { en: "nineteen", ja: "十九" }, { en: "twenty", ja: "二十" },
+   { en: "coast", ja: "海岸" }, { en: "crops", ja: "作物" }, { en: "flexible", ja: "柔軟な" }, { en: "gentle", ja: "優しい" }, { en: "germs", ja: "細菌" }, { en: "glide", ja: "滑空する" }, { en: "history", ja: "歴史" }, { en: "shadow", ja: "影" }, { en: "tame", ja: "飼いならされた" }, { en: "vapor", ja: "蒸気" }, { en: "advertising", ja: "広告" }, { en: "cabin", ja: "小屋、客室" }, { en: "illustrated", ja: "イラスト入りの" }, { en: "integrity", ja: "誠実さ" }, { en: "molt", ja: "脱皮する" }, { en: "nectar", ja: "花蜜" }, { en: "popular", ja: "人気のある" }, { en: "published", ja: "出版された" }, { en: "seasons", ja: "季節" }, { en: "tropical", ja: "熱帯の" }, { en: "channel", ja: "水路、チャンネル" }, { en: "election", ja: "選挙" }, { en: "festival", ja: "祭り" }, { en: "gigantic", ja: "巨大な" }, { en: "mammal", ja: "哺乳類" }, { en: "medal", ja: "メダル" }, { en: "pilot", ja: "パイロット" }, { en: "schedule", ja: "予定" }, { en: "sibling", ja: "兄弟姉妹" }, { en: "vote", ja: "投票する" }, { en: "bit", ja: "少し" }, { en: "fill", ja: "満たす" }, { en: "fit", ja: "合う" }, { en: "hit", ja: "打つ" }, { en: "miss", ja: "逃す、いなくて寂しい" }, { en: "lay", ja: "置く、横たえる" }, { en: "may", ja: "〜かもしれない" }, { en: "job", ja: "仕事" }, { en: "lot", ja: "たくさん" }, { en: "top", ja: "頂上" }, { en: "drop", ja: "落ちる、落とす" }, { en: "hill", ja: "丘" }, { en: "bill", ja: "請求書、くちばし" }, { en: "fun", ja: "楽しみ" }, { en: "game", ja: "ゲーム" }, { en: "doll", ja: "人形" }, { en: "spot", ja: "場所、斑点" }, { en: "box", ja: "箱" }, { en: "gas", ja: "ガス、ガソリン" }, { en: "map", ja: "地図" }, { en: "child", ja: "子供" }, { en: "hope", ja: "希望する" }, { en: "note", ja: "メモ、注意する" }, { en: "bad", ja: "悪い" }, { en: "glad", ja: "嬉しい" }, { en: "sat", ja: "座った" }, { en: "stand", ja: "立つ" }, { en: "act", ja: "行動する" }, { en: "flat", ja: "平らな" }, { en: "plan", ja: "計画" }, { en: "shall", ja: "〜するつもりだ" }, { en: "lost", ja: "失った" }, { en: "seat", ja: "座席" }, { en: "heat", ja: "熱" }, { en: "meet", ja: "会う" }, { en: "seen", ja: "見た" }, { en: "fell", ja: "落ちた" }, { en: "set", ja: "置く、設定する" }, { en: "spell", ja: "綴る" }, { en: "rest", ja: "休み" }, { en: "led", ja: "導いた" }, { en: "friend", ja: "友達" }, { en: "ready", ja: "準備ができて" }, { en: "end", ja: "終わり" }, { en: "send", ja: "送る" }, { en: "free", ja: "自由な、無料の" }, { en: "real", ja: "本物の" }, { en: "sent", ja: "送った" }, { en: "near", ja: "近くの" }, { en: "told", ja: "話した" }, { en: "took", ja: "取った" }, { en: "move", ja: "動く" }, { en: "gone", ja: "去った" }, { en: "maybe", ja: "もしかすると" }, { en: "ago", ja: "〜前に" }, { en: "list", ja: "リスト" }, { en: "mine", ja: "私のもの" }, { en: "lie", ja: "横たわる、嘘をつく" }, { en: "side", ja: "側" }, { en: "wide", ja: "広い" }, { en: "cost", ja: "費用がかかる" }, { en: "without", ja: "〜なしで" }, { en: "ate", ja: "食べた" }, { en: "past", ja: "過去" }, { en: "place", ja: "場所" }, { en: "stay", ja: "滞在する" }, { en: "wait", ja: "待つ" }, { en: "safe", ja: "安全な" }, { en: "art", ja: "芸術" }, { en: "step", ja: "歩み、段" }, { en: "full", ja: "いっぱいの" }, { en: "knew", ja: "知っていた" }, { en: "turn", ja: "回る" }, { en: "rock", ja: "岩" }, { en: "block", ja: "ブロック" }, { en: "barn", ja: "納屋" }, { en: "fire", ja: "火" }, { en: "glass", ja: "ガラス" }, { en: "hole", ja: "穴" }, { en: "letter", ja: "手紙、文字" }, { en: "sail", ja: "帆、航海する" }, { en: "smile", ja: "微笑む" }, { en: "tail", ja: "尻尾" }, { en: "team", ja: "チーム" }, { en: "hair", ja: "髪" }, { en: "rich", ja: "豊かな" }, { en: "trip", ja: "旅行" }, { en: "tomorrow", ja: "明日" }, { en: "cool", ja: "涼しい" }, { en: "dark", ja: "暗い" }, { en: "deep", ja: "深い" }, { en: "during", ja: "〜の間に" }, { en: "test", ja: "テスト" }, { en: "trade", ja: "交換する" }, { en: "track", ja: "跡、追跡する" }, { en: "rule", ja: "規則" }, { en: "else", ja: "他に" }, { en: "almost", ja: "ほとんど" }, { en: "enjoy", ja: "楽しむ" }, { en: "front", ja: "前" }, { en: "great", ja: "素晴らしい" }, { en: "learn", ja: "学ぶ" }, { en: "might", ja: "〜かもしれない" }, { en: "sure", ja: "確かな" }, { en: "beside", ja: "〜のそばに" }, { en: "feeling", ja: "感情" }, { en: "understand", ja: "理解する" }, { en: "cook", ja: "料理する" }, { en: "cross", ja: "交差する" }, { en: "half", ja: "半分" }, { en: "ring", ja: "輪、鳴る" }, { en: "snow", ja: "雪" }, { en: "line", ja: "線" }, { en: "number", ja: "数" }, { en: "paint", ja: "塗る" }, { en: "rope", ja: "ロープ" }, { en: "wood", ja: "木材" }, { en: "yet", ja: "まだ" }, { en: "along", ja: "〜に沿って" }, { en: "air", ja: "空気" }, { en: "guess", ja: "推測する" }, { en: "happen", ja: "起こる" }, { en: "left", ja: "左、残った" }, { en: "main", ja: "主な" }, { en: "nearly", ja: "ほとんど" }, { en: "pay", ja: "支払う" }, { en: "sound", ja: "音" }, { en: "above", ja: "〜の上に" }, { en: "began", ja: "始めた" }, { en: "being", ja: "存在、〜であること" }, { en: "born", ja: "生まれた" }, { en: "able", ja: "できる" }, { en: "allow", ja: "許可する" }, { en: "across", ja: "〜を横切って" }, { en: "corner", ja: "角" }, { en: "count", ja: "数える" }, { en: "busy", ja: "忙しい" }, { en: "cannot", ja: "できない" }, { en: "clear", ja: "はっきりした" }, { en: "hurry", ja: "急ぐ" }, { en: "itself", ja: "それ自身" }, { en: "fact", ja: "事実" }, { en: "fear", ja: "恐れ" }, { en: "means", ja: "意味する、手段" }, { en: "miles", ja: "マイル" }, { en: "music", ja: "音楽" }, { en: "quiet", ja: "静かな" }, { en: "really", ja: "本当に" }, { en: "return", ja: "戻る" }, { en: "rise", ja: "上がる" }, { en: "money", ja: "お金" }, { en: "oil", ja: "油" }, { en: "roll", ja: "転がる" }, { en: "bottle", ja: "瓶" }, { en: "change", ja: "変わる" }, { en: "finish", ja: "終わる" }, { en: "key", ja: "鍵" }, { en: "knife", ja: "ナイフ" }, { en: "watch", ja: "見る、時計" }, { en: "shapes", ja: "形" }, { en: "afraid", ja: "恐れて" }, { en: "size", ja: "サイズ" }, { en: "strong", ja: "強い" }, { en: "simple", ja: "簡単な" }, { en: "song", ja: "歌" }, { en: "speed", ja: "速度" }, { en: "surprise", ja: "驚き" }, { en: "since", ja: "〜以来" }, { en: "sometimes", ja: "時々" }, { en: "young", ja: "若い" }, { en: "pair", ja: "ペア" }, { en: "against", ja: "〜に反対して" }, { en: "already", ja: "すでに" }, { en: "beautiful", ja: "美しい" }, { en: "become", ja: "〜になる" }, { en: "believe", ja: "信じる" }, { en: "belong", ja: "属する" }, { en: "center", ja: "中心" }, { en: "certain", ja: "確かな" }, { en: "choose", ja: "選ぶ" }, { en: "complete", ja: "完成させる" }, { en: "copy", ja: "コピーする" }, { en: "cover", ja: "覆う" }, { en: "present", ja: "現在、贈り物、出席して" }, { en: "hundred", ja: "百" }, { en: "knock", ja: "ノックする" }, { en: "shovel", ja: "ショベル" }, { en: "square", ja: "正方形" }, { en: "spring", ja: "春" }, { en: "string", ja: "糸" }, { en: "breakfast", ja: "朝食" }, { en: "building", ja: "建物" }, { en: "church", ja: "教会" }, { en: "circus", ja: "サーカス" }, { en: "doctor", ja: "医者" }, { en: "decide", ja: "決める" }, { en: "describe", ja: "描写する" }, { en: "different", ja: "異なる" }, { en: "enough", ja: "十分な" }, { en: "explain", ja: "説明する" }, { en: "heavy", ja: "重い" }, { en: "however", ja: "しかしながら" }, { en: "important", ja: "重要な" }, { en: "lovely", ja: "可愛らしい" }, { en: "piece", ja: "かけら" }, { en: "point", ja: "点" }, { en: "problem", ja: "問題" }, { en: "question", ja: "質問" }, { en: "special", ja: "特別な" }, { en: "subject", ja: "主題、科目" }, { en: "suddenly", ja: "突然" }, { en: "thought", ja: "考え" }, { en: "touch", ja: "触る" }, { en: "toward", ja: "〜に向かって" } 
+  ],
+  book2: [
+   { en: "briefly", ja: "短く、簡潔に" }, { en: "bronze", ja: "青銅" }, { en: "concentrate", ja: "集中する" }, { en: "design", ja: "デザインする、設計する" }, { en: "displayed", ja: "展示された" }, { en: "exhibition", ja: "展示、展覧会" }, { en: "glacier", ja: "氷河" }, { en: "league", ja: "リーグ、連盟" }, { en: "relief", ja: "救済、安心" }, { en: "representing", ja: "代表して、表して" }, { en: "copper", ja: "銅" }, { en: "relieve", ja: "和らげる、安心させる" }, { en: "astronomy", ja: "天文学" }, { en: "choosing", ja: "選ぶこと" }, { en: "degrees", ja: "程度、度" }, { en: "demanding", ja: "要求の厳しい" }, { en: "descriptions", ja: "描写、説明" }, { en: "improve", ja: "向上させる" }, { en: "instant", ja: "即座の" }, { en: "recreation", ja: "レクリエーション、娯楽" }, { en: "scattered", ja: "散らばった" }, { en: "vertically", ja: "垂直に" }, { en: "central", ja: "中央の" }, { en: "discuss", ja: "議論する" }, { en: "interviewing", ja: "インタビューすること" }, { en: "murmuring", ja: "つぶやき" }, { en: "organized", ja: "組織された、整理された" }, { en: "rely", ja: "頼る" }, { en: "rural", ja: "田舎の" }, { en: "statue", ja: "像" }, { en: "urban", ja: "都会の" }, { en: "vapor", ja: "蒸気" }, { en: "energy", ja: "エネルギー" }, { en: "factor", ja: "要因" }, { en: "government", ja: "政府" }, { en: "healthy", ja: "健康な" }, { en: "interpret", ja: "解釈する" }, { en: "knowledge", ja: "知識" }, { en: "leaders", ja: "指導者たち" }, { en: "passage", ja: "通路、一節" }, { en: "community", ja: "地域社会" }, { en: "fraction", ja: "分数、一部" }, { en: "furrowed", ja: "しわの寄った" }, { en: "material", ja: "材料、物質" }, { en: "opinion", ja: "意見" }, { en: "procedure", ja: "手順" }, { en: "traditional", ja: "伝統的な" }, { en: "transportation", ja: "交通機関、輸送" }, { en: "chart", ja: "図表" }, { en: "climate", ja: "気候" }, { en: "economy", ja: "経済" }, { en: "legend", ja: "伝説" }, { en: "mental", ja: "精神的な" }, { en: "symbols", ja: "記号、象徴" }, { en: "system", ja: "システム、制度" }, { en: "temperature", ja: "温度、体温" }, { en: "biome", ja: "生物群系" }, { en: "collide", ja: "衝突する" }, { en: "famished", ja: "飢えた" }, { en: "fantasy", ja: "空想、ファンタジー" }, { en: "geyser", ja: "間欠泉" }, { en: "physician", ja: "医師、内科医" }, { en: "porous", ja: "多孔性の" }, { en: "sensible", ja: "賢明な、分別のある" }, { en: "slogan", ja: "スローガン、標語" }, { en: "superb", ja: "素晴らしい" }, { en: "align", ja: "整列させる" }, { en: "archaeologists", ja: "考古学者" }, { en: "ecosystem", ja: "生態系" }, { en: "elaborate", ja: "精巧な、詳しく述べる" }, { en: "epicenter", ja: "震央" }, { en: "increment", ja: "増加" }, { en: "integrity", ja: "誠実さ" }, { en: "lunges", ja: "ランジ（運動）" }, { en: "manor", ja: "荘園、領主の館" }, { en: "tiers", ja: "段、層" }, { en: "attire", ja: "服装" }, { en: "gigantic", ja: "巨大な" }, { en: "hazardous", ja: "危険な" }, { en: "median", ja: "中央値" }, { en: "ornately", ja: "華やかに" }, { en: "prestigious", ja: "名声のある" }, { en: "punctual", ja: "時間を守る" }, { en: "revolution", ja: "革命" }, { en: "sapling", ja: "苗木" }, { en: "correct", ja: "正しい" }, { en: "quickly", ja: "素早く" }, { en: "person", ja: "人" }, { en: "became", ja: "〜になった" }, { en: "shown", ja: "示された" }, { en: "minutes", ja: "分" }, { en: "strong", ja: "強い" }, { en: "verbs", ja: "動詞" }, { en: "stars", ja: "星" }, { en: "front", ja: "前" }, { en: "feel", ja: "感じる" }, { en: "fact", ja: "事実" }, { en: "inches", ja: "インチ" }, { en: "street", ja: "通り" }, { en: "decided", ja: "決めた" }, { en: "contain", ja: "含む" }, { en: "course", ja: "進路、コース" }, { en: "surface", ja: "表面" }, { en: "produce", ja: "生産する" }, { en: "building", ja: "建物" }, { en: "ocean", ja: "海" }, { en: "class", ja: "クラス、階級" }, { en: "note", ja: "メモ、注意する" }, { en: "nothing", ja: "何も〜ない" }, { en: "rest", ja: "休み、残り" }, { en: "carefully", ja: "注意深く" }, { en: "scientist", ja: "科学者" }, { en: "inside", ja: "内側に" }, { en: "wheels", ja: "車輪" }, { en: "stay", ja: "滞在する、とどまる" }, { en: "green", ja: "緑" }, { en: "known", ja: "知られている" }, { en: "island", ja: "島" }, { en: "week", ja: "週" }, { en: "less", ja: "より少ない" }, { en: "machine", ja: "機械" }, { en: "base", ja: "基礎" }, { en: "ago", ja: "〜前に" }, { en: "stood", ja: "立った" }, { en: "plane", ja: "飛行機" }, { en: "system", ja: "体系、システム" }, { en: "behind", ja: "後ろに" }, { en: "ran", ja: "走った" }, { en: "round", ja: "丸い" }, { en: "boat", ja: "ボート" }, { en: "game", ja: "ゲーム" }, { en: "force", ja: "力、強要する" }, { en: "brought", ja: "持ってきた" }, { en: "understand", ja: "理解する" }, { en: "warm", ja: "暖かい" }, { en: "common", ja: "共通の、普通の" }, { en: "bring", ja: "持ってくる" }, { en: "explain", ja: "説明する" }, { en: "dry", ja: "乾いた" }, { en: "though", ja: "〜だけれども" }, { en: "language", ja: "言語" }, { en: "shape", ja: "形" }, { en: "deep", ja: "深い" }, { en: "thousands", ja: "何千もの" }, { en: "clear", ja: "はっきりした" }, { en: "equation", ja: "方程式" }, { en: "yet", ja: "まだ" }, { en: "filled", ja: "満たされた" }, { en: "heat", ja: "熱" }, { en: "full", ja: "いっぱいの" }, { en: "hot", ja: "暑い" }, { en: "check", ja: "調べる" }, { en: "object", ja: "物体、反対する" }, { en: "rule", ja: "規則" }, { en: "among", ja: "〜の間に" }, { en: "noun", ja: "名詞" }, { en: "power", ja: "力" }, { en: "cannot", ja: "〜できない" }, { en: "able", ja: "できる" }, { en: "size", ja: "大きさ" }, { en: "dark", ja: "暗い" }, { en: "ball", ja: "ボール" }, { en: "special", ja: "特別な" }, { en: "heavy", ja: "重い" }, { en: "fine", ja: "素晴らしい、細かい" }, { en: "pair", ja: "一対" }, { en: "circle", ja: "円" }, { en: "include", ja: "含む" }, { en: "built", ja: "建てられた" }, { en: "matter", ja: "問題、物質" }, { en: "square", ja: "正方形、広場" }, { en: "syllables", ja: "音節" }, { en: "perhaps", ja: "おそらく" }, { en: "bill", ja: "請求書、紙幣" }, { en: "felt", ja: "感じた" }, { en: "suddenly", ja: "突然" }, { en: "test", ja: "試験" }, { en: "direction", ja: "方向" }, { en: "center", ja: "中心" }, { en: "farmers", ja: "農民" }, { en: "ready", ja: "準備ができて" }, { en: "anything", ja: "何でも" }, { en: "divided", ja: "分割された" }, { en: "general", ja: "一般的な" }, { en: "subject", ja: "主題、科目" }, { en: "moon", ja: "月" }, { en: "region", ja: "地域" }, { en: "return", ja: "戻る" }, { en: "believed", ja: "信じられた" }, { en: "dance", ja: "踊る" }, { en: "members", ja: "メンバー" }, { en: "picked", ja: "選ばれた、摘まれた" }, { en: "simple", ja: "簡単な" }, { en: "cells", ja: "細胞、電池" }, { en: "paint", ja: "塗る" }, { en: "mind", ja: "心" }, { en: "love", ja: "愛する" }, { en: "cause", ja: "原因" }, { en: "rain", ja: "雨" }, { en: "exercise", ja: "運動" }, { en: "eggs", ja: "卵" }, { en: "train", ja: "電車" }, { en: "blue", ja: "青" }, { en: "wish", ja: "願う" }, { en: "drop", ja: "落ちる" }, { en: "developed", ja: "発達した" }, { en: "window", ja: "窓" }, { en: "difference", ja: "違い" }, { en: "distance", ja: "距離" }, { en: "heart", ja: "心臓、心" }, { en: "sit", ja: "座る" }, { en: "sum", ja: "合計" }, { en: "summer", ja: "夏" }, { en: "wall", ja: "壁" }, { en: "forest", ja: "森" }, { en: "probably", ja: "おそらく" }, { en: "legs", ja: "脚" }, { en: "sat", ja: "座った" }, { en: "main", ja: "主な" }, { en: "winter", ja: "冬" }, { en: "wide", ja: "広い" }, { en: "written", ja: "書かれた" }, { en: "length", ja: "長さ" }, { en: "reason", ja: "理由" }, { en: "kept", ja: "保たれた" }, { en: "interest", ja: "興味" }, { en: "arms", ja: "腕" }, { en: "brother", ja: "兄弟" }, { en: "race", ja: "競争" }, { en: "present", ja: "プレゼント、現在の" }, { en: "beautiful", ja: "美しい" }, { en: "store", ja: "店" }, { en: "job", ja: "仕事" }, { en: "edge", ja: "端" }, { en: "past", ja: "過去" }, { en: "sign", ja: "標識、署名する" }, { en: "record", ja: "記録" }, { en: "finished", ja: "終わった" }, { en: "discovered", ja: "発見された" }, { en: "wild", ja: "野生の" }, { en: "happy", ja: "幸せな" }, { en: "beside", ja: "〜のそばに" }, { en: "gone", ja: "去った" }, { en: "sky", ja: "空" }, { en: "glass", ja: "ガラス" }, { en: "million", ja: "百万" }, { en: "west", ja: "西" }, { en: "lay", ja: "横たえる" }, { en: "weather", ja: "天気" }, { en: "root", ja: "根" }, { en: "instruments", ja: "楽器" }, { en: "meet", ja: "会う" }, { en: "third", ja: "3番目の" }, { en: "months", ja: "月" }, { en: "paragraph", ja: "段落" }, { en: "raised", ja: "育てられた" }
+   { en: "conservation", ja: "保護、保存" }, { en: "cuneiform", ja: "楔形文字" }, { en: "erosion", ja: "浸食" }, { en: "gridiron", ja: "アメフトのフィールド、焼き網" }, { en: "organisms", ja: "生物、有機体" }, { en: "polyps", ja: "ポリープ、サンゴ虫" }, { en: "schedule", ja: "予定、スケジュール" }, { en: "sediment", ja: "堆積物" }, { en: "tempo", ja: "テンポ、速度" }, { en: "ignoble", ja: "卑劣な、不名誉な" }, { en: "specious", ja: "もっともらしい" }, { en: "ersatz", ja: "代用の、偽の" }, { en: "debacle", ja: "大失敗、崩壊" }, { en: "collateral", ja: "担保、見返り" }, { en: "demean", ja: "品位を落とす" }, { en: "punishment", ja: "罰" }, { en: "disappear", ja: "消える" }, { en: "presoak", ja: "事前に浸す" }, { en: "rewind", ja: "巻き戻す" }, { en: "colorless", ja: "無色の" }, { en: "unsure", ja: "確信がない" }, { en: "hypothesis", ja: "仮説" }, { en: "conclusions", ja: "結論" }, { en: "prediction", ja: "予測" }, { en: "biology", ja: "生物学" }, { en: "pathology", ja: "病理学" }, { en: "chronology", ja: "年代順" }, { en: "chronicle", ja: "年代記" }, { en: "education", ja: "教育" }, { en: "communication", ja: "コミュニケーション" }, { en: "safety", ja: "安全" }, { en: "protection", ja: "保護" }, { en: "transportation", ja: "交通機関" }, { en: "health", ja: "健康" }, { en: "restrict", ja: "制限する" }, { en: "pollution", ja: "汚染" }, { en: "inspecting", ja: "検査すること" }, { en: "thermal", ja: "熱の" }, { en: "thermometer", ja: "温度計" }, { en: "audience", ja: "聴衆" }, { en: "bibliography", ja: "参考文献" }, { en: "geography", ja: "地理学" }, { en: "geology", ja: "地質学" }, { en: "conducted", ja: "実施された" }, { en: "applicants", ja: "応募者" }, { en: "accumulate", ja: "蓄積する" }, { en: "surrounded", ja: "囲まれた" }, { en: "strengthen", ja: "強化する" }, { en: "reap", ja: "収穫する、得る" }, { en: "benefits", ja: "利益" }, { en: "slightly", ja: "わずかに" }, { en: "bent", ja: "曲がった" }, { en: "inhale", ja: "息を吸う" }, { en: "exhale", ja: "息を吐く" }, { en: "repetitions", ja: "繰り返し" }, { en: "rotate", ja: "回転させる" }, { en: "inward", ja: "内側へ" }, { en: "outward", ja: "外側へ" }, { en: "straighten", ja: "まっすぐにする" }, { en: "gushed", ja: "勢いよく流れ出た" }, { en: "anxious", ja: "心配して、切望して" }, { en: "luggage", ja: "手荷物" }, { en: "offered", ja: "提供した" }, { en: "canceled", ja: "キャンセルした" }, { en: "vegetable", ja: "野菜" }, { en: "marshmallow", ja: "マシュマロ" }, { en: "interpreting", ja: "解釈すること" }, { en: "prove", ja: "証明する" }, { en: "valid", ja: "妥当な、有効な" }, { en: "precedes", ja: "先行する" }, { en: "representative", ja: "代表者" }, { en: "varnish", ja: "ニス" }, { en: "knitted", ja: "編んだ" }, { en: "forced", ja: "強制された" }, { en: "particles", ja: "粒子" }, { en: "molecules", ja: "分子" }, { en: "static", ja: "静電気の、静的な" }, { en: "allusion", ja: "ほのめかし" }, { en: "foreshadowing", ja: "伏線" }, { en: "irony", ja: "皮肉" }, { en: "conflict", ja: "対立、葛藤" }, { en: "hyperbole", ja: "誇張表現" }, { en: "dialogue", ja: "対話" }, { en: "imagery", ja: "比喩的表現、像" }, { en: "setting", ja: "背景、設定" }, { en: "struggle", ja: "もがく、闘い" }, { en: "fictitious", ja: "架空の" }, { en: "exaggeration", ja: "誇張" }, { en: "perspective", ja: "観点、視点" }, { en: "intend", ja: "意図する" }, { en: "descriptive", ja: "描写的な" }, { en: "consequence", ja: "結果" }, { en: "demonstrating", ja: "実証すること" }, { en: "appreciation", ja: "感謝、評価" }, { en: "proudly", ja: "誇らしげに" }, { en: "anticipate", ja: "予期する" }, { en: "accurate", ja: "正確な" }, { en: "claims", ja: "主張する" }, { en: "identify", ja: "特定する" }, { en: "possess", ja: "所有する" }, { en: "career", ja: "経歴、職業" }, { en: "preserve", ja: "保存する" }, { en: "firmly", ja: "しっかりと" }, { en: "abdomen", ja: "腹部" }, { en: "intestines", ja: "腸" }, { en: "probability", ja: "確率" }, { en: "requires", ja: "必要とする" }, { en: "commitment", ja: "約束、献身" }, { en: "chores", ja: "雑用" }, { en: "priority", ja: "優先事項" }, { en: "achieve", ja: "達成する" }, { en: "impress", ja: "印象づける" }, { en: "trait", ja: "特徴" }, { en: "spectacle", ja: "壮観、見世物" }, { en: "transport", ja: "輸送する" }, { en: "monarchy", ja: "君主制" }, { en: "canyon", ja: "峡谷" }, { en: "cape", ja: "岬" }, { en: "delta", ja: "三角州" }, { en: "dune", ja: "砂丘" }, { en: "glacier", ja: "氷河" }, { en: "isthmus", ja: "地峡" }, { en: "lagoon", ja: "潟、ラグーン" }, { en: "mesa", ja: "周囲が急斜面で頂上が平らな地形" }, { en: "oasis", ja: "オアシス" }, { en: "pampas", ja: "パンパ（大草原）" }, { en: "plateau", ja: "高原" }, { en: "reservoir", ja: "貯水池" }, { en: "savanna", ja: "サバンナ" }, { en: "steppes", ja: "ステップ（大平原）" }, { en: "strait", ja: "海峡" }, { en: "tributary", ja: "支流" }, { en: "shrubs", ja: "低木" }, { en: "abash", ja: "恥じじらわせる" }, { en: "census", ja: "国勢調査" }, { en: "demographic", ja: "人口統計の" }, { en: "habitat", ja: "生息地" }, { en: "inhabitants", ja: "住民" }, { en: "interval", ja: "間隔" }, { en: "occupations", ja: "職業" }, { en: "precise", ja: "正確な" }, { en: "province", ja: "州、省" }, { en: "scholars", ja: "学者" }, { en: "firm", ja: "会社、固い" }, { en: "coast", ja: "海岸" }, { en: "current", ja: "現在の、流れ" }, { en: "ranch", ja: "牧場" }, { en: "eager", ja: "熱望して" }, { en: "speckled", ja: "斑点のある" }, { en: "counselor", ja: "カウンセラー" }, { en: "candid", ja: "率直な" }, { en: "balmy", ja: "穏やかな、さわやかな" }, { en: "exultant", ja: "大喜びの" }, { en: "docile", ja: "従順な" }, { en: "competent", ja: "有能な" }, { en: "sprint", ja: "全力疾走する" }, { en: "alternate", ja: "交互にする" }, { en: "bursts", ja: "破裂、突発" }, { en: "accelerated", ja: "加速した" }, { en: "inconceivable", ja: "信じられない" }, { en: "accustomed", ja: "慣れた" }, { en: "apologized", ja: "謝罪した" }, { en: "inundating", ja: "殺到する、水浸しにする" }, { en: "assign", ja: "割り当てる" }, { en: "aloof", ja: "よそよそしい" }, { en: "vivacious", ja: "活発な、陽気な" }, { en: "canopy", ja: "林冠、天蓋" }, { en: "programs", ja: "プログラム" }, { en: "recreational", ja: "娯楽の" }, { en: "weathering", ja: "風化" }, { en: "dissolves", ja: "溶かす" }, { en: "cliff", ja: "崖" }, { en: "cracks", ja: "ひび" }, { en: "rust", ja: "錆" }, { en: "pits", ja: "くぼみ" }, { en: "pollutants", ja: "汚染物質" }, { en: "formation", ja: "形成" }, { en: "archaeologists", ja: "考古学者" }, { en: "sod", ja: "芝土" }, { en: "fireplace", ja: "暖炉" }, { en: "orbit", ja: "軌道" }, { en: "binary", ja: "連星の、2進法の" }, { en: "furniture", ja: "家具" }, { en: "supplies", ja: "備品" }, { en: "primary", ja: "主な、最初の" }, { en: "provides", ja: "提供する" }, { en: "interprets", ja: "解釈する" }, { en: "posthumously", ja: "死後に" }, { en: "chronological", ja: "年代順の" }, { en: "benevolent", ja: "慈悲深い" }, { en: "correlate", ja: "関連付ける" }, { en: "synopsis", ja: "あらすじ、概要" }, { en: "indisputably", ja: "明白に、議論の余地なく" }, { en: "psoriasis", ja: "乾癬（かんせん）" }, { en: "abrasion", ja: "擦り傷、摩耗" }, { en: "amiable", ja: "愛想の良い" }, { en: "beverage", ja: "飲み物" }, { en: "mentioned", ja: "言及した" }, { en: "conduct", ja: "実施する、案内する" }, { en: "dictionary", ja: "辞書" }, { en: "encyclopedia", ja: "百科事典" }, { en: "atlas", ja: "地図帳" }, { en: "originate", ja: "起こる、始まる" }, { en: "preposterous", ja: "不条理な、ばかげた" }, { en: "sustenance", ja: "食物、維持" }, { en: "mandate", ja: "命令、権限" }, { en: "obtrusive", ja: "押し付けがましい" }, { en: "rebuke", ja: "叱責する" }, { en: "sinister", ja: "邪悪な" }, { en: "contemplate", ja: "熟考する" }, { en: "deviate", ja: "逸脱する" }, { en: "enigma", ja: "謎" }, { en: "video", ja: "映像" }, { en: "invisible", ja: "目に見えない" }, { en: "envision", ja: "心に描く" }, { en: "synchronize", ja: "同時に起きる、同期する" }, { en: "anachronism", ja: "時代錯誤" }, { en: "liberty", ja: "自由" }, { en: "deliberate", ja: "故意の、熟考する" }, { en: "liberal", ja: "自由主義の、寛大な" }, { en: "architecture", ja: "建築" }, { en: "biome", ja: "生物群系" }, { en: "constellation", ja: "星座" }, { en: "hieroglyphics", ja: "象形文字" }, { en: "incessant", ja: "絶え間ない" }, { en: "integrity", ja: "誠実さ" }, { en: "pesticides", ja: "殺虫剤" }, { en: "prospectors", ja: "探鉱者" }, { en: "Renaissance", ja: "ルネサンス、復興" }
+  ],
+  book3: [
+    { en: "abandon", ja: "捨てる、放棄する" }, { en: "absolute", ja: "絶対的な" }, { en: "abuse", ja: "乱用、虐待" }, { en: "academic", ja: "学問の" }, { en: "accelerate", ja: "加速する" }, { en: "acceptable", ja: "受け入れられる" }, { en: "access", ja: "アクセス、接近" }, { en: "accessible", ja: "アクセスできる" }, { en: "accommodate", ja: "収容する" }, { en: "accomplish", ja: "達成する" }, { en: "accomplishment", ja: "達成" }, { en: "accountability", ja: "説明責任" }, { en: "accurate", ja: "正確な" }, { en: "accusation", ja: "告発" }, { en: "accuse", ja: "非難する、告発する" }, { en: "achieve", ja: "達成する" }, { en: "achievement", ja: "達成、業績" }, { en: "acknowledge", ja: "認める" }, { en: "acquire", ja: "習得する" }, { en: "acquisition", ja: "獲得" }, { en: "activist", ja: "活動家" }, { en: "actual", ja: "実際の" }, { en: "adapt", ja: "適応させる" }, { en: "adequate", ja: "十分な" }, { en: "adjust", ja: "調整する" }, { en: "adjustment", ja: "調整" }, { en: "administer", ja: "管理する" }, { en: "administration", ja: "管理、政権" }, { en: "administrative", ja: "管理の" }, { en: "administrator", ja: "管理者" }, { en: "admission", ja: "入場、入会" }, { en: "admit", ja: "認める" }, { en: "adolescent", ja: "青年期の" }, { en: "adopt", ja: "採用する" }, { en: "adoption", ja: "採用" }, { en: "advance", ja: "前進する" }, { en: "advanced", ja: "進歩した" }, { en: "advantage", ja: "利点" }, { en: "adventure", ja: "冒険" }, { en: "advertising", ja: "広告" }, { en: "advice", ja: "助言" }, { en: "advise", ja: "助言する" }, { en: "advocacy", ja: "擁護" }, { en: "advocate", ja: "提唱する" }, { en: "affair", ja: "事柄、問題" }, { en: "affect", ja: "影響を与える" }, { en: "afford", ja: "～する余裕がある" }, { en: "agency", ja: "代理店、機関" }, { en: "agenda", ja: "協議事項" }, { en: "agent", ja: "代理人" }, { en: "aggression", ja: "侵略、攻撃" }, { en: "aggressive", ja: "攻撃的な" }, { en: "agricultural", ja: "農業の" }, { en: "agriculture", ja: "農業" }, { en: "aide", ja: "側近、助手" }, { en: "aircraft", ja: "航空機" }, { en: "airline", ja: "航空会社" }, { en: "airport", ja: "空港" }, { en: "aisle", ja: "通路" }, { en: "alarm", ja: "警報" }, { en: "album", ja: "アルバム" }, { en: "alcohol", ja: "アルコール" }, { en: "alien", ja: "外国人、宇宙人" }, { en: "allegation", ja: "申し立て" }, { en: "allegedly", ja: "伝えられるところでは" }, { en: "alliance", ja: "同盟" }, { en: "allusion", ja: "ほのめかし" }, { en: "ally", ja: "同盟国" }, { en: "alter", ja: "変える" }, { en: "alternative", ja: "代わりの、選択肢" }, { en: "altogether", ja: "完全に、全く" }, { en: "aluminum", ja: "アルミニウム" }, { en: "amazing", ja: "驚くべき" }, { en: "ambassador", ja: "大使" }, { en: "ambiguous", ja: "曖昧な" }, { en: "ambition", ja: "野心" }, { en: "ambitious", ja: "野心的な" }, { en: "amendment", ja: "修正、改正" }, { en: "amid", ja: "〜の真っ只中に" }, { en: "amount", ja: "量" }, { en: "analogy", ja: "類推" }, { en: "analysis", ja: "分析" }, { en: "analyst", ja: "アナリスト" }, { en: "analytical", ja: "分析的な" }, { en: "analyze", ja: "分析する" }, { en: "ancestor", ja: "祖先" }, { en: "ancient", ja: "古代の" }, { en: "anger", ja: "怒り" }, { en: "angle", ja: "角度" }, { en: "angry", ja: "怒って" }, { en: "animal", ja: "動物" }, { en: "anniversary", ja: "記念日" }, { en: "announce", ja: "発表する" }, { en: "announcement", ja: "発表" }, { en: "annual", ja: "年次の" }, { en: "annually", ja: "毎年" }, { en: "anonymous", ja: "匿名の" }, { en: "anticipate", ja: "予期する" }, { en: "antonym", ja: "対義語" }, { en: "anxiety", ja: "不安" }, { en: "anxious", ja: "心配して" }, { en: "anyway", ja: "とにかく" }, { en: "anywhere", ja: "どこでも" }, { en: "apart", ja: "離れて" }, { en: "apartment", ja: "アパート" }, { en: "apparent", ja: "明白な" }, { en: "apparently", ja: "見たところでは" }, { en: "appeal", ja: "訴える、魅力" }, { en: "appearance", ja: "外見、出現" }, { en: "apple", ja: "りんご" }, { en: "application", ja: "申し込み、適用" }, { en: "apply", ja: "適用する、申し込む" }, { en: "appoint", ja: "任命する" }, { en: "appointment", ja: "約束、任命" }, { en: "appositive", ja: "同格の" }, { en: "appreciate", ja: "感謝する、評価する" }, { en: "appreciation", ja: "感謝、評価" }, { en: "approach", ja: "接近、方法" }, { en: "appropriate", ja: "適切な" }, { en: "approval", ja: "承認" }, { en: "approve", ja: "承認する" }, { en: "approximately", ja: "およそ" }, { en: "Arab", ja: "アラブの" }, { en: "architect", ja: "建築家" }, { en: "architecture", ja: "建築" }, { en: "arena", ja: "アリーナ、舞台" }, { en: "argue", ja: "議論する、主張する" }, { en: "argument", ja: "議論、主張" }, { en: "arise", ja: "生じる" }, { en: "armed", ja: "武装した" }, { en: "army", ja: "軍隊" }, { en: "arrangement", ja: "手配、配置" }, { en: "arrest", ja: "逮捕する" }, { en: "arrival", ja: "到着" }, { en: "arrive", ja: "到着する" }, { en: "arrow", ja: "矢" }, { en: "article", ja: "記事" }, { en: "artifact", ja: "人工物、工芸品" }, { en: "artificial", ja: "人工の" }, { en: "artistic", ja: "芸術的な" }, { en: "ash", ja: "灰" }, { en: "Asian", ja: "アジアの" }, { en: "aside", ja: "脇へ" }, { en: "asleep", ja: "眠って" }, { en: "aspect", ja: "側面" }, { en: "assault", ja: "暴行、攻撃" }, { en: "assemble", ja: "集める、組み立てる" }, { en: "assembly", ja: "集会、組み立て" }, { en: "assert", ja: "断言する" }, { en: "assess", ja: "評価する" }, { en: "assessment", ja: "評価" }, { en: "asset", ja: "資産" }, { en: "assign", ja: "割り当てる" }, { en: "assignment", ja: "割り当て、宿題" }, { en: "assist", ja: "助ける" }, { en: "assistance", ja: "援助" }, { en: "assistant", ja: "助手" }, { en: "associate", ja: "関連付ける" }, { en: "associated", ja: "関連した" }, { en: "association", ja: "協会、関連" }, { en: "assume", ja: "仮定する" }, { en: "assumption", ja: "仮定" }, { en: "assure", ja: "保証する" }, { en: "astronomer", ja: "天文学者" }, { en: "athlete", ja: "運動選手" }, { en: "athletic", ja: "運動の" }, { en: "atmosphere", ja: "大気、雰囲気" }, { en: "atop", ja: "〜の頂上に" }, { en: "attach", ja: "取り付ける" }, { en: "attack", ja: "攻撃する" }, { en: "attempt", ja: "試み、試みる" }, { en: "attend", ja: "出席する" }, { en: "attendance", ja: "出席" }, { en: "attention", ja: "注意" }, { en: "attitude", ja: "態度" }, { en: "attorney", ja: "弁護士" }, { en: "attract", ja: "引きつける" }, { en: "attraction", ja: "魅力、アトラクション" }, { en: "attractive", ja: "魅力的な" }, { en: "attribute", ja: "属性、帰する" }, { en: "auction", ja: "オークション" }, { en: "audience", ja: "聴衆" }, { en: "author", ja: "著者" }, { en: "authority", ja: "権威、当局" }, { en: "authorize", ja: "認可する" }, { en: "automatic", ja: "自動の" }, { en: "automatically", ja: "自動的に" }, { en: "automobile", ja: "自動車" }, { en: "autonomy", ja: "自治" }, { en: "availability", ja: "利用できること" }, { en: "available", ja: "利用できる" }, { en: "average", ja: "平均" }, { en: "avoid", ja: "避ける" }, { en: "awake", ja: "目覚めて" }, { en: "award", ja: "賞" }, { en: "aware", ja: "気づいて" }, { en: "awareness", ja: "認識" }, { en: "awful", ja: "ひどい" }, { en: "barrier", ja: "障壁" }, { en: "base", ja: "基礎" }, { en: "basic", ja: "基本的な" }, { en: "basically", ja: "基本的に" }, { en: "basis", ja: "基礎" }, { en: "battle", ja: "戦闘" }, { en: "behavior", ja: "行動" }, { en: "behavioral", ja: "行動の" }, { en: "belief", ja: "信念" }, { en: "bellicose", ja: "好戦的な" }, { en: "belligerent", ja: "好戦的な" }, { en: "belong", ja: "属する" }, { en: "benefit", ja: "利益、恩恵" }, { en: "bias", ja: "偏見" }, { en: "biological", ja: "生物学的な" }, { en: "biology", ja: "生物学" }, { en: "birth", ja: "誕生" }, { en: "blame", ja: "非難する" }, { en: "blind", ja: "目の見えない" }, { en: "bond", ja: "絆、債券" }, { en: "border", ja: "国境、境界" }, { en: "boundary", ja: "境界" }, { en: "brief", ja: "短い、簡潔な" }, { en: "briefly", ja: "短く" }, { en: "brilliant", ja: "素晴らしい、光り輝く" }, { en: "budget", ja: "予算" }, { en: "bullheaded", ja: "頑固な" }, { en: "burden", ja: "負担" }, { en: "bureau", ja: "局" }, { en: "calculate", ja: "計算する" }, { en: "calculation", ja: "計算" }, { en: "campaign", ja: "キャンペーン、運動" }, { en: "campus", ja: "キャンパス" }, { en: "capable", ja: "有能な" }, { en: "capacity", ja: "能力、容量" }, { en: "capital", ja: "資本、首都" }, { en: "capture", ja: "捕らえる" }, { en: "career", ja: "経歴、職業" }, { en: "casual", ja: "カジュアルな、思いがけない" }, { en: "casualty", ja: "犠牲者" }, { en: "category", ja: "カテゴリー" }, { en: "cease", ja: "やめる" }, { en: "celebrate", ja: "祝う" }, { en: "celebration", ja: "祝賀" }, { en: "celebrity", ja: "有名人" }, { en: "century", ja: "世紀" }, { en: "ceremony", ja: "儀式" }, { en: "chain", ja: "鎖、チェーン" }, { en: "challenge", ja: "挑戦" }, { en: "chamber", ja: "部屋、議院" }, { en: "champion", ja: "チャンピオン" }, { en: "championship", ja: "選手権" }, { en: "character", ja: "性格、登場人物" }, { en: "characteristic", ja: "特徴" }, { en: "characterize", ja: "特徴づける" }, { en: "charge", ja: "請求する、非難する" }, { en: "charity", ja: "慈善" }, { en: "chart", ja: "図表" }, { en: "chase", ja: "追いかける" }, { en: "cheat", ja: "不正をする" }, { en: "chemical", ja: "化学の" }, { en: "chemistry", ja: "化学" }, { en: "chief", ja: "長、主な" }, { en: "childhood", ja: "子供時代" }, { en: "chronic", ja: "慢性の" }, { en: "circuit", ja: "回路" }, { en: "circumstance", ja: "状況" }, { en: "cite", ja: "引用する" }, { en: "citizen", ja: "市民" }, { en: "citizenship", ja: "市民権" }, { en: "civic", ja: "市民の" }, { en: "civil", ja: "市民の、国内の" }, { en: "civilian", ja: "民間人" }, { en: "civilization", ja: "文明" }, { en: "claim", ja: "主張する" }, { en: "classic", ja: "傑作、古典的な" }, { en: "classical", ja: "古典的な" }, { en: "classify", ja: "分類する" }, { en: "clause", ja: "節" }, { en: "climate", ja: "気候" }, { en: "clinic", ja: "クリニック" }, { en: "clinical", ja: "臨床の" }, { en: "closely", ja: "密接に" }, { en: "coalition", ja: "提携、連立" }, { en: "coastal", ja: "海岸の" }, { en: "cognitive", ja: "認知の" }, { en: "collapse", ja: "崩壊する" }, { en: "colleague", ja: "同僚" }, { en: "collect", ja: "集める" }, { en: "collection", ja: "収集" }, { en: "collective", ja: "集団の" }, { en: "collector", ja: "収集家" }, { en: "college", ja: "大学" }, { en: "colonial", ja: "植民地の" }, { en: "colony", ja: "植民地" }, { en: "column", ja: "コラム、円柱" }, { en: "columnist", ja: "コラムニスト" }, { en: "combat", ja: "戦闘" }, { en: "combination", ja: "組み合わせ" }, { en: "combine", ja: "結びつける" }, { en: "comedy", ja: "喜劇" }, { en: "comfort", ja: "快適さ" }, { en: "comfortable", ja: "快適な" }, { en: "command", ja: "命令、指揮する" }, { en: "commander", ja: "指揮官" }, { en: "comment", ja: "コメント" }, { en: "commercial", ja: "商業の、CM" }, { en: "commission", ja: "委員会" }, { en: "commissioner", ja: "委員" }, { en: "commit", ja: "犯す、委ねる" }, { en: "commitment", ja: "献身、約束" }, { en: "committee", ja: "委員会" }, { en: "commodity", ja: "商品" }, { en: "common", ja: "共通の、普通の" }, { en: "commonly", ja: "一般に" }, 
+    { en: "communicate", ja: "伝達する" }, { en: "communication", ja: "コミュニケーション" }, { en: "community", ja: "地域社会" }, { en: "companion", ja: "仲間" }, { en: "company", ja: "会社、仲間" }, { en: "comparable", ja: "比較できる" }, { en: "compare", ja: "比較する" }, { en: "comparison", ja: "比較" }, { en: "compel", ja: "強いる" }, { en: "compelling", ja: "説得力のある" }, { en: "compensation", ja: "補償" }, { en: "compete", ja: "競争する" }, { en: "competition", ja: "競争" }, { en: "competitive", ja: "競争力のある" }, { en: "competitor", ja: "競争相手" }, { en: "complain", ja: "不平を言う" }, { en: "complaint", ja: "苦情" }, { en: "complement", ja: "補完する" }, { en: "complete", ja: "完全な、完了する" }, { en: "completely", ja: "完全に" }, { en: "complex", ja: "複雑な" }, { en: "complexity", ja: "複雑さ" }, { en: "compliance", ja: "応諾、服従" }, { en: "complicated", ja: "複雑な" }, { en: "comply", ja: "従う" }, { en: "component", ja: "構成要素" }, { en: "compose", ja: "構成する、作曲する" }, { en: "composition", ja: "構成、作文" }, { en: "compound", ja: "化合物" }, { en: "comprehensive", ja: "包括的な" }, { en: "comprise", ja: "構成される" }, { en: "compromise", ja: "妥協する" }, { en: "computer", ja: "コンピューター" }, { en: "concede", ja: "認める" }, { en: "conceivable", ja: "考えられる" }, { en: "conceive", ja: "想像する" }, { en: "concept", ja: "概念" }, { en: "conception", ja: "概念、構想" }, { en: "concern", ja: "関心、懸念" }, { en: "concerned", ja: "心配して" }, { en: "concerning", ja: "〜に関して" }, { en: "concert", ja: "コンサート" }, { en: "conclude", ja: "結論づける" }, { en: "conclusion", ja: "結論" }, { en: "concrete", ja: "具体的な" }, { en: "condemn", ja: "非難する" }, { en: "condescending", ja: "見下すような" }, { en: "condition", ja: "状態、条件" }, { en: "conduct", ja: "実施する、振る舞い" }, { en: "conference", ja: "会議" }, { en: "confess", ja: "告白する" }, { en: "confession", ja: "告白" }, { en: "confidence", ja: "自信" }, { en: "confident", ja: "自信がある" }, { en: "confirm", ja: "確認する" }, { en: "conflict", ja: "対立、紛争" }, { en: "confront", ja: "直面する" }, { en: "confrontation", ja: "対立" }, { en: "confuse", ja: "混乱させる" }, { en: "confusion", ja: "混乱" }, { en: "congressional", ja: "議会の" }, { en: "connect", ja: "接続する" }, { en: "connection", ja: "接続、関係" }, { en: "connotation", ja: "言外の意味" }, { en: "conscience", ja: "良心" }, { en: "conscious", ja: "意識している" }, { en: "consciousness", ja: "意識" }, { en: "consecutive", ja: "連続した" }, { en: "consensus", ja: "合意" }, { en: "consent", ja: "同意" }, { en: "consequence", ja: "結果" }, { en: "conservation", ja: "保護" }, { en: "conservative", ja: "保守的な" }, { en: "consider", ja: "考慮する" }, { en: "considerable", ja: "かなりの" }, { en: "considerably", ja: "かなり" }, { en: "consideration", ja: "考慮" }, { en: "consist", ja: "成る" }, { en: "consistent", ja: "一貫した" }, { en: "consistently", ja: "常に" }, { en: "conspiracy", ja: "陰謀" }, { en: "constant", ja: "絶え間ない" }, { en: "constantly", ja: "常に" }, { en: "constitute", ja: "構成する" }, { en: "constitution", ja: "憲法" }, { en: "constitutional", ja: "憲法の" }, { en: "constraint", ja: "制約" }, { en: "construct", ja: "建設する" }, { en: "construction", ja: "建設" }, { en: "consult", ja: "相談する" }, { en: "consultant", ja: "コンサルタント" }, { en: "consume", ja: "消費する" }, { en: "consumer", ja: "消費者" }, { en: "consumption", ja: "消費" }, { en: "contact", ja: "接触" }, { en: "contain", ja: "含む" }, { en: "container", ja: "容器" }, { en: "contemporary", ja: "現代の" }, { en: "contend", ja: "主張する、争う" }, { en: "content", ja: "内容" }, { en: "contest", ja: "コンテスト" }, { en: "context", ja: "文脈" }, { en: "continent", ja: "大陸" }, { en: "continue", ja: "続ける" }, { en: "continued", ja: "継続した" }, { en: "continuing", ja: "継続中の" }, { en: "continuous", ja: "連続的な" }, { en: "contract", ja: "契約" }, { en: "contractor", ja: "契約業者" }, { en: "contrast", ja: "対照" }, { en: "contribute", ja: "貢献する" }, { en: "contribution", ja: "貢献" }, { en: "contributor", ja: "貢献者" }, { en: "control", ja: "制御" }, { en: "controversial", ja: "議論を呼ぶ" }, { en: "controversy", ja: "論争" }, { en: "convenience", ja: "便利" }, { en: "convention", ja: "慣習、大会" }, { en: "conventional", ja: "従来の" }, { en: "conversation", ja: "会話" }, { en: "conversion", ja: "転換" }, { en: "convert", ja: "変換する" }, { en: "convey", ja: "伝える" }, { en: "convict", ja: "有罪を宣告する" }, { en: "conviction", ja: "有罪判決、信念" }, { en: "convince", ja: "納得させる" }, { en: "convinced", ja: "確信して" }, { en: "cooperate", ja: "協力する" }, { en: "cooperation", ja: "協力" }, { en: "cooperative", ja: "協力的な" }, { en: "coordinate", ja: "調整する" }, { en: "coordinator", ja: "調整役" }, { en: "cope", ja: "対処する" }, { en: "core", ja: "核心" }, { en: "corporate", ja: "企業の" }, { en: "corporation", ja: "企業" }, { en: "correctly", ja: "正確に" }, { en: "correlation", ja: "相関" }, { en: "correspondent", ja: "特派員" }, { en: "corridor", ja: "廊下" }, { en: "corruption", ja: "腐敗" }, { en: "costly", ja: "高価な" }, { en: "cottage", ja: "コテージ" }, { en: "council", ja: "議会、会議" }, { en: "counsel", ja: "助言" }, { en: "counseling", ja: "カウンセリング" }, { en: "counselor", ja: "カウンセラー" }, { en: "counterpart", ja: "相当するもの" }, { en: "county", ja: "郡" }, { en: "coup", ja: "クーデター" }, { en: "courage", ja: "勇気" }, { en: "courtroom", ja: "法廷" }, { en: "coverage", ja: "報道、補償範囲" }, { en: "crack", ja: "割れ目" }, { en: "craft", ja: "工芸" }, { en: "crash", ja: "衝突" }, { en: "crawl", ja: "腹ばいで進む" }, { en: "creative", ja: "創造的な" }, { en: "creativity", ja: "創造性" }, { en: "creature", ja: "生き物" }, { en: "credit", ja: "信用" }, { en: "crew", ja: "乗組員" }, { en: "crime", ja: "犯罪" }, { en: "criminal", ja: "犯罪の、犯罪者" }, { en: "crisis", ja: "危機" }, { en: "criteria", ja: "基準" }, { en: "critic", ja: "批評家" }, { en: "critical", ja: "批判的な、重大な" }, { en: "criticism", ja: "批判" }, { en: "criticize", ja: "批判する" }, { en: "crucial", ja: "決定的な" }, { en: "cruel", ja: "残酷な" }, { en: "cruise", ja: "巡航" }, { en: "crush", ja: "押しつぶす" }, { en: "crystal", ja: "結晶" }, { en: "cultural", ja: "文化の" }, { en: "culture", ja: "文化" }, { en: "cure", ja: "治療" }, { en: "curiosity", ja: "好奇心" }, { en: "curious", ja: "好奇心の強い" }, { en: "currency", ja: "通貨" }, { en: "current", ja: "現在の" }, { en: "currently", ja: "現在" }, { en: "curriculum", ja: "カリキュラム" }, { en: "custody", ja: "拘留、親権" }, { en: "custom", ja: "習慣" }, { en: "customer", ja: "顧客" }, { en: "cycle", ja: "周期、サイクル" }, { en: "denotation", ja: "明示的意味" }, { en: "diplomatic", ja: "外交的な" }, { en: "euphemism", ja: "婉曲表現" }, { en: "firm", ja: "固い、断固とした" }, { en: "hyperbole", ja: "誇張法" }, { en: "irony", ja: "皮肉" }, { en: "mythological", ja: "神話の" }, { en: "oxymoron", ja: "矛盾語法" }, { en: "paradox", ja: "逆説" }, { en: "persistent", ja: "粘り強い" }, { en: "polite", ja: "礼儀正しい" }, { en: "precede", ja: "先行する" }, { en: "pun", ja: "語呂合わせ" }, { en: "rebel", ja: "反逆者" }, { en: "recede", ja: "後退する" }, { en: "refined", ja: "洗練された" }, { en: "resolute", ja: "断固たる" }, { en: "respectful", ja: "敬意を表する" }, { en: "secede", ja: "離脱する" }, { en: "synonym", ja: "同義語" }, { en: "syntax", ja: "統語論" }, { en: "willful", ja: "意図的な" }
+    { en: "APR", ja: "年換算金利（Annual Percentage Rate。クレジットカードやローンの金利。必ず確認すべき数字）" },
+    { en: "BYOB", ja: "お酒・飲み物持ち込み制（Bring Your Own Booze/Beverage。パーティの招待状などに書かれます）" },
+    { en: "Cash back", ja: "（スーパーのレジ等で）デビットカード支払い時に現金を引き出すサービス、またはカードのポイント還元" },
+    { en: "Citation", ja: "（交通違反などの）罰金切符、召喚状（Ticketとも呼ばれます）" },
+    { en: "Credit score", ja: "個人の信用偏差値（家を借りる、ローンを組む、就職する際にもチェックされるアメリカ生活の命綱）" },
+    { en: "DMV", ja: "車両管理局（Department of Motor Vehicles。運転免許の取得や車の登録で行く、アメリカ人が最も嫌うお役所）" },
+    { en: "DUI / DWI", ja: "飲酒・薬物運転（Driving Under the Influence。極めて重い罪になります）" },
+    { en: "ER", ja: "救急救命室（Emergency Room。命に関わる時のみ行く場所。盲腸などの手術でも数百万〜数千万円の請求が来ることも）" },
+    { en: "Escrow", ja: "エスクロー（不動産売買などで、第三者が代金や書類を一時預かる安全な取引システム）" },
+    { en: "Eviction", ja: "（家賃滞納などによる）強制立ち退き（履歴に残ると次に家を借りるのが絶望的になります）" },
+    { en: "Fender bender", ja: "軽い車の接触事故（バンパーがへこむ程度の軽い事故）" },
+    { en: "Fine print", ja: "（契約書の下のほうにある）小さな文字の注意書き、不利な条件（Read the fine print!とよく言われます）" },
+    { en: "Gratuity", ja: "チップ、心付け（レストランのレシートに「Gratuity included」とあれば二重に払う必要はありません）" },
+    { en: "HOA", ja: "管理組合（Homeowners Association。住宅街の景観やルールの維持を管理。芝生が伸びているだけで罰金を取られることも）" },
+    { en: "Identity theft", ja: "個人情報の盗用（SSNなどを盗まれ、勝手にカードを作られるアメリカで非常に多い犯罪）" },
+    { en: "IRS", ja: "アメリカ合衆国内国歳入庁（Internal Revenue Service。日本の国税庁。恐れられる存在です）" },
+    { en: "Lemon", ja: "欠陥車、不良品（新車で何度も故障する車を指す。消費者を守るLemon lawという法律があります）" },
+    { en: "Loitering", ja: "（目的もなく）うろつくこと、たむろすること（No loiteringの看板がある場所にとどまると警察を呼ばれます）" },
+    { en: "Notary public", ja: "公証人（重要な契約書や委任状には、彼らの面前でサインしてハンコをもらう「Notarize」が必要です）" },
+    { en: "Out-of-network", ja: "保険適用外の（米国の医療保険はネットワーク内の医師[In-network]に診てもらわないと、全額自己負担になり破産のリスクがあります）" },
+    { en: "Outage", ja: "停電、断水、システムダウン（Power outageで停電）" },
+    { en: "Overdraft", ja: "口座の残高不足による当座借越（銀行口座の残高を超えてカードを使うと、高いペナルティ手数料[Overdraft fee]を取られます）" },
+    { en: "PCP", ja: "かかりつけ医（Primary Care Physician。専門医に行く前に、まずは自分のPCPの紹介状[Referral]が必要な保険プランが多いです）" },
+    { en: "Potluck", ja: "参加者が料理を一品ずつ持ち寄る形式のパーティ" },
+    { en: "Premium", ja: "（保険の）掛け金、毎月の保険料" },
+    { en: "Raincheck", ja: "（特売品が売り切れた際に発行してもらう）後日同じ割引価格で買える引換券" },
+    { en: "RSVP", ja: "出欠のご返事をお願いします（フランス語由来ですが、招待状の必須単語です）" },
+    { en: "Scam", ja: "詐欺（電話やメールでの詐欺。Scammerは詐欺師）" },
+    { en: "SSN", ja: "ソーシャル・セキュリティ・ナンバー（社会保障番号。マイナンバーの強力版で、これがないと銀行口座開設もアパート契約も困難です）" },
+    { en: "Sublet / Sublease", ja: "又貸し、転貸（アパートの契約者が別の人に部屋を貸すこと。契約違反になることが多いので注意が必要）" },
+    { en: "Tow-away zone", ja: "レッカー移動区域（ここに駐車すると有無を言わさず車を持っていかれ、高額な罰金と保管料を取られます）" },
+    { en: "Trespassing", ja: "不法侵入（私有地に勝手に入ること。No trespassingの看板を無視すると、最悪の場合銃で撃たれるリスクがあります）" },
+    { en: "Urgent care", ja: "救急クリニック（ERに行くほどではないが、すぐに診てほしい時[骨折や高熱など]に行く予約不要の病院。ERよりはるかに安いです）" },
+    { en: "Utilities", ja: "光熱費（電気、ガス、水道、ゴミ収集などの総称）" },
+    { en: "W-2", ja: "源泉徴収票（会社員が確定申告[Tax return]をするために1月末頃に会社から送られてくる必須書類）" }
+  ],
+  book4: [
+    { en: "abate", ja: "和らぐ、減らす" },
+    { en: "aberrant", ja: "常軌を逸した、異常な" },
+    { en: "abeyance", ja: "一時的休止、未定" },
+    { en: "abridge", ja: "要約する、短縮する" },
+    { en: "abscond", ja: "逃亡する、姿をくらます" },
+    { en: "abstemious", ja: "（飲食を）節制する" },
+    { en: "abstruse", ja: "難解な" },
+    { en: "accolade", ja: "称賛、栄誉" },
+    { en: "accretion", ja: "付加、増大" },
+    { en: "acerbic", ja: "辛辣な、すっぱい" },
+    { en: "acquiesce", ja: "黙従する、しぶしぶ同意する" },
+    { en: "acrimonious", ja: "（言葉などが）とげとげしい" },
+    { en: "acumen", ja: "鋭さ、洞察力" },
+    { en: "admonish", ja: "忠告する、たしなめる" },
+    { en: "adroit", ja: "器用な、機敏な" },
+    { en: "adulation", ja: "お世辞、過度の称賛" },
+    { en: "adulterate", ja: "混ぜ物をする、質を落とす" },
+    { en: "aesthetic", ja: "美的な、美学の" },
+    { en: "affable", ja: "愛想の良い、気軽に話せる" },
+    { en: "aggregate", ja: "集める、総計の" },
+    { en: "alacrity", ja: "敏速、活発" },
+    { en: "alleviate", ja: "（苦痛などを）和らげる" },
+    { en: "amalgamate", ja: "合併する、合同する" },
+    { en: "ambiguous", ja: "曖昧な" },
+    { en: "ambivalence", ja: "相反する感情、ためらい" },
+    { en: "ameliorate", ja: "改善する、良くなる" },
+    { en: "anachronism", ja: "時代錯誤" },
+    { en: "analogous", ja: "類似した" },
+    { en: "anarchy", ja: "無政府状態、無秩序" },
+    { en: "anomaly", ja: "例外、変則" },
+    { en: "antagonize", ja: "反感を買う、敵に回す" },
+    { en: "antipathy", ja: "反感、嫌悪" },
+    { en: "apathy", ja: "無関心、無感情" },
+    { en: "appease", ja: "なだめる、譲歩する" },
+    { en: "apprise", ja: "知らせる、通知する" },
+    { en: "approbation", ja: "承認、称賛" },
+    { en: "appropriate", ja: "（資金などを）充当する、私物化する" },
+    { en: "arcane", ja: "秘密の、不可解な" },
+    { en: "arduous", ja: "困難な、骨の折れる" },
+    { en: "artless", ja: "気取らない、純真な" },
+    { en: "ascetic", ja: "禁欲的な、苦行者" },
+    { en: "assiduous", ja: "勤勉な、根気強い" },
+    { en: "assuage", ja: "（苦痛や怒りを）和らげる" },
+    { en: "attenuate", ja: "細くする、弱める" },
+    { en: "audacious", ja: "大胆な、無礼な" },
+    { en: "austere", ja: "厳しい、装飾のない" },
+    { en: "autonomous", ja: "自治の、自主的な" },
+    { en: "avarice", ja: "強欲、貪欲" },
+    { en: "aver", ja: "断言する、主張する" },
+    { en: "banal", ja: "ありふれた、平凡な" },
+    { en: "belie", ja: "偽る、矛盾する" },
+    { en: "beneficent", ja: "情け深い、恩恵を施す" },
+    { en: "bolster", ja: "支持する、強化する" },
+    { en: "bombastic", ja: "大げさな、誇張した" },
+    { en: "boorish", ja: "がさつな、無作法な" },
+    { en: "burgeon", ja: "急成長する、芽生える" },
+    { en: "burnish", ja: "磨く、つやを出す" },
+    { en: "cacophony", ja: "不協和音、耳障りな音" },
+    { en: "capricious", ja: "気まぐれな" },
+    { en: "castigate", ja: "厳しく非難する、懲戒する" },
+    { en: "catalyst", ja: "触媒、変化を促すもの" },
+    { en: "caustic", ja: "腐食性の、辛辣な" },
+    { en: "chicanery", ja: "ごまかし、詭弁" },
+    { en: "coagulate", ja: "凝固する、固まる" },
+    { en: "cogent", ja: "説得力のある" },
+    { en: "commensurate", ja: "釣り合った、同程度の" },
+    { en: "compendium", ja: "概略、要約" },
+    { en: "complaisant", ja: "丁寧な、愛想のよい" },
+    { en: "compliant", ja: "従順な、応じる" },
+    { en: "conciliatory", ja: "なだめるような、融和的な" },
+    { en: "condone", ja: "大目に見る、許す" },
+    { en: "confound", ja: "混乱させる、混同する" },
+    { en: "connoisseur", ja: "（美術品などの）鑑定家、目利き" },
+    { en: "contention", ja: "論争、主張" },
+    { en: "contentious", ja: "論争を好む、議論を引き起こす" },
+    { en: "contrite", ja: "悔悟した、深く悔いている" },
+    { en: "conundrum", ja: "難問、なぞなぞ" },
+    { en: "converge", ja: "集中する、一点に向かう" },
+    { en: "convoluted", ja: "複雑な、入り組んだ" },
+    { en: "craven", ja: "臆病な、意気地のない" },
+    { en: "daunt", ja: "威圧する、怯ませる" },
+    { en: "dearth", ja: "不足、欠乏" },
+    { en: "default", ja: "不履行、怠慢" },
+    { en: "deference", ja: "敬意、服従" },
+    { en: "delineate", ja: "輪郭を描く、図解する" },
+    { en: "denigrate", ja: "中傷する、見くびる" },
+    { en: "deride", ja: "あざ笑う、馬鹿にする" },
+    { en: "derivative", ja: "派生的な、独創性のない" },
+    { en: "desiccate", ja: "乾燥させる、生気を失わせる" },
+    { en: "desultory", ja: "とりとめのない、散漫な" },
+    { en: "deterrent", ja: "抑止するもの、妨げ" },
+    { en: "diatribe", ja: "痛烈な非難、酷評" },
+    { en: "dichotomy", ja: "二分法、二項対立" },
+    { en: "diffidence", ja: "自信のなさ、遠慮" },
+    { en: "diffuse", ja: "散布する、拡散した" },
+    { en: "digression", ja: "脱線、本題から逸れること" },
+    { en: "dirge", ja: "挽歌、哀悼歌" },
+    { en: "disabuse", ja: "迷いから解く、誤りを悟らせる" },
+    { en: "discerning", ja: "洞察力のある、目の肥えた" },
+    { en: "discordant", ja: "調和しない、耳障りな" },
+    { en: "discredit", ja: "信用を落とす、疑う" },
+    { en: "discrepancy", ja: "矛盾、不一致" },
+    { en: "discrete", ja: "分離した、個別の" },
+    { en: "disingenuous", ja: "不誠実な、陰険な" },
+    { en: "disinterested", ja: "公平な、私心のない" },
+    { en: "disjointed", ja: "バラバラの、支離滅裂な" },
+    { en: "dismiss", ja: "退ける、解雇する" },
+    { en: "disparage", ja: "見くびる、けなす" },
+    { en: "disparate", ja: "本質的に異なる" },
+    { en: "dissemble", ja: "（感情などを）隠す、ふりをする" },
+    { en: "disseminate", ja: "散布する、普及させる" },
+    { en: "dissolution", ja: "解散、分解" },
+    { en: "dissonance", ja: "不協和音、不一致" },
+    { en: "distend", ja: "膨張させる、広げる" },
+    { en: "distill", ja: "蒸留する、エッセンスを抽出する" },
+    { en: "diverge", ja: "分岐する、異なる" },
+    { en: "divest", ja: "剥奪する、手放す" },
+    { en: "document", ja: "文書で証明する、記録する" },
+    { en: "dogmatic", ja: "独断的な、教条的な" },
+    { en: "dormant", ja: "休眠状態の、活動休止中の" },
+    { en: "dupe", ja: "騙す、騙されやすい人" },
+    { en: "ebullient", ja: "熱狂的な、溢れんばかりの" },
+    { en: "eclectic", ja: "折衷的な、多方面にわたる" },
+    { en: "efficacy", ja: "効能、有効性" },
+    { en: "effrontery", ja: "厚かましさ、鉄面皮" },
+    { en: "elegy", ja: "哀歌、挽歌" },
+    { en: "elicit", ja: "引き出す、誘い出す" },
+    { en: "embellish", ja: "飾る、粉飾する" },
+    { en: "empirical", ja: "経験的な、経験主義の" },
+    { en: "emulate", ja: "見習う、張り合う" },
+    { en: "endemic", ja: "特有の、風土性の" },
+    { en: "enervate", ja: "気力を奪う、弱める" },
+    { en: "engender", ja: "生じさせる、発生させる" },
+    { en: "enhance", ja: "高める、増す" },
+    { en: "enigma", ja: "謎、不可解なもの" },
+    { en: "ephemeral", ja: "つかの間の、短命の" },
+    { en: "equanimity", ja: "平静、落ち着き" },
+    { en: "equivocate", ja: "言葉を濁す、曖昧に言う" },
+    { en: "erudite", ja: "博学な、学問的な" },
+    { en: "esoteric", ja: "難解な、秘伝の" },
+    { en: "eulogy", ja: "追悼の辞、賛辞" },
+    { en: "euphemism", ja: "婉曲表現" },
+    { en: "exacerbate", ja: "悪化させる、激化させる" },
+    { en: "exculpate", ja: "無罪とする、免れさせる" },
+    { en: "exigency", ja: "緊急事態、急務" },
+    { en: "extrapolation", ja: "外挿、推定" },
+    { en: "facetious", ja: "おどけた、滑稽な" },
+    { en: "facilitate", ja: "容易にする、促進する" },
+    { en: "fallacious", ja: "誤った、当てにならない" },
+    { en: "fatuous", ja: "愚かな、間抜けな" },
+    { en: "fawning", ja: "へつらう、ご機嫌をとる" },
+    { en: "felicitous", ja: "適切な、巧みな" },
+    { en: "fervor", ja: "熱情、熱心" },
+    { en: "fledgling", ja: "駆け出しの、巣立ち間近の鳥" },
+    { en: "flout", ja: "（法律などを）嘲笑する、無視する" },
+    { en: "foment", ja: "助長する、扇動する" },
+    { en: "forestall", ja: "未然に防ぐ、機先を制する" },
+    { en: "frugality", ja: "倹約、質素" },
+    { en: "futile", ja: "無駄な、効果のない" },
+    { en: "gainsay", ja: "否定する、反対する" },
+    { en: "garrulous", ja: "おしゃべりな、多弁な" },
+    { en: "goad", ja: "扇動する、けしかける" },
+    { en: "gouge", ja: "法外な代金をふっかける、えぐり出す" },
+    { en: "grandiloquent", ja: "大げさな、誇張した" },
+    { en: "gregarious", ja: "社交的な、群生する" },
+    { en: "guileless", ja: "悪気のない、純真な" },
+    { en: "gullible", ja: "騙されやすい" },
+    { en: "hackneyed", ja: "陳腐な、ありふれた" },
+    { en: "halcyon", ja: "穏やかな、平和な" },
+    { en: "harangue", ja: "長広舌、熱弁" },
+    { en: "hedonism", ja: "快楽主義" },
+    { en: "hegemony", ja: "覇権、主導権" },
+    { en: "heterogeneous", ja: "異種の、混成の" },
+    { en: "homogeneous", ja: "同種の、均質の" },
+    { en: "hyperbole", ja: "誇張法、大げさな表現" },
+    { en: "iconoclast", ja: "因習打破主義者、聖像破壊者" },
+    { en: "idolatry", ja: "偶像礼拝、盲目的崇拝" },
+    { en: "immutable", ja: "不変の" },
+    { en: "impair", ja: "損なう、減じる" },
+    { en: "impassive", ja: "無感情の、平然とした" },
+    { en: "impede", ja: "妨害する、遅らせる" },
+    { en: "impermeable", ja: "不浸透性の、通さない" },
+    { en: "imperturbable", ja: "沈着な、動じない" },
+    { en: "impervious", ja: "影響されない、水を通さない" },
+    { en: "implacable", ja: "なだめられない、執念深い" },
+    { en: "implicit", ja: "暗黙の、絶対的な" },
+    { en: "implode", ja: "内側に破裂する、崩壊する" },
+    { en: "inadvertently", ja: "うっかり、不注意に" },
+    { en: "inchoate", ja: "初期の、未発達の" },
+    { en: "incongruity", ja: "不調和、不適合" },
+    { en: "inconsequential", ja: "取るに足らない、重要でない" },
+    { en: "incorporate", ja: "組み込む、法人化する" },
+    { en: "indeterminate", ja: "不確定の、漠然とした" },
+    { en: "indigence", ja: "貧困、極貧" },
+    { en: "indolent", ja: "怠惰な、怠け者の" },
+    { en: "inert", ja: "自力で動けない、不活性の" },
+    { en: "ingenuous", ja: "無邪気な、率直な" },
+    { en: "inherent", ja: "本来備わっている、固有の" },
+    { en: "innocuous", ja: "無害な、悪気のない" },
+    { en: "insensible", ja: "無感覚な、気絶した" },
+    { en: "insinuate", ja: "ほのめかす、当てこする" },
+    { en: "insipid", ja: "無味乾燥な、面白みがない" },
+    { en: "insularity", ja: "島国根性、偏狭" },
+    { en: "intractable", ja: "手に負えない、強情な" },
+    { en: "intransigence", ja: "非妥協的な態度、強硬" },
+    { en: "inundate", ja: "殺到する、水浸しにする" },
+    { en: "inured", ja: "（困難などに）慣れた" },
+    { en: "invective", ja: "毒舌、非難" },
+    { en: "irascible", ja: "怒りっぽい、短気な" },
+    { en: "irresolute", ja: "決断力のない、優柔不断な" }
+    { en: "jaundiced", ja: "偏見を持った、ひがんだ" },
+    { en: "jejune", ja: "無味乾燥な、幼稚な" },
+    { en: "jocular", ja: "滑稽な、ひょうきんな" },
+    { en: "judicious", ja: "賢明な、思慮深い" },
+    { en: "juxtapose", ja: "並置する、並べて比べる" },
+    { en: "kindle", ja: "火をつける、感情を燃え立たせる" },
+    { en: "kinetic", ja: "運動の、動的な" },
+    { en: "knell", ja: "弔鐘、凶兆" },
+    { en: "knotty", ja: "複雑な、困難な" },
+    { en: "kudos", ja: "称賛、名声" },
+    { en: "laconic", ja: "簡潔な、口数の少ない" },
+    { en: "lament", ja: "悲しむ、嘆く" },
+    { en: "lampoon", ja: "風刺する、皮肉る" },
+    { en: "languid", ja: "だるい、無気力な" },
+    { en: "lassitude", ja: "疲労、無気力" },
+    { en: "latent", ja: "潜在的な、隠れた" },
+    { en: "laud", ja: "褒め称える、賛美する" },
+    { en: "lethargic", ja: "無気力な、鈍感な" },
+    { en: "levee", ja: "堤防、土手" },
+    { en: "levity", ja: "軽薄さ、軽率" },
+    { en: "log", ja: "記録、日誌" },
+    { en: "loquacious", ja: "おしゃべりな、多弁な" },
+    { en: "lucid", ja: "明快な、わかりやすい" },
+    { en: "luminous", ja: "光り輝く、明るい" },
+    { en: "magnanimity", ja: "寛大さ、度量の広さ" },
+    { en: "malinger", ja: "仮病を使う" },
+    { en: "malleable", ja: "適応性のある、影響されやすい" },
+    { en: "maverick", ja: "異端者、一匹狼" },
+    { en: "mendacious", ja: "虚偽の、嘘つきの" },
+    { en: "mercurial", ja: "移り気な、気まぐれな" },
+    { en: "metamorphosis", ja: "変態、変容" },
+    { en: "meticulous", ja: "細心の注意を払った、きちょうめんな" },
+    { en: "misanthrope", ja: "人間嫌い" },
+    { en: "mitigate", ja: "和らげる、軽減する" },
+    { en: "mollify", ja: "なだめる、和らげる" },
+    { en: "morose", ja: "気難しい、むっつりした" },
+    { en: "mundane", ja: "ありふれた、日常の" },
+    { en: "nadir", ja: "どん底、最下点" },
+    { en: "naive", ja: "純真な、世間知らずの" },
+    { en: "nebulous", ja: "曖昧な、星雲状の" },
+    { en: "negate", ja: "無効にする、否定する" },
+    { en: "neophyte", ja: "初心者、新改宗者" },
+    { en: "nexus", ja: "結びつき、核心" },
+    { en: "noisome", ja: "悪臭のする、不快な" },
+    { en: "nuance", ja: "ニュアンス、微妙な違い" },
+    { en: "obdurate", ja: "頑固な、強情な" },
+    { en: "obfuscate", ja: "分かりにくくする、混乱させる" },
+    { en: "obsequious", ja: "へつらう、こびへつらう" },
+    { en: "obsequy", ja: "葬儀" },
+    { en: "obsolete", ja: "時代遅れの、廃れた" },
+    { en: "obviate", ja: "未然に防ぐ、不要にする" },
+    { en: "occlude", ja: "塞ぐ、遮断する" },
+    { en: "officious", ja: "おせっかいな、差し出がましい" },
+    { en: "onerous", ja: "厄介な、煩わしい" },
+    { en: "opaque", ja: "不透明な、分かりにくい" },
+    { en: "opprobrium", ja: "不名誉、非難" },
+    { en: "oscillate", ja: "揺れ動く、振動する" },
+    { en: "ostentatious", ja: "見栄を張る、派手な" },
+    { en: "pacify", ja: "なだめる、平和にする" },
+    { en: "palpable", ja: "明白な、触知できる" },
+    { en: "panegyric", ja: "賛辞、称賛の演説" },
+    { en: "paradigm", ja: "模範、パラダイム" },
+    { en: "paradox", ja: "逆説、矛盾" },
+    { en: "paragon", ja: "模範、鑑" },
+    { en: "partisan", ja: "熱狂的な支持者、党派心の強い" },
+    { en: "pathological", ja: "病的な、病理学の" },
+    { en: "paucity", ja: "不足、欠乏" },
+    { en: "pedantic", ja: "学者ぶった、知識をひけらかす" },
+    { en: "pellucid", ja: "透明な、明快な" },
+    { en: "penchant", ja: "強い傾向、好み" },
+    { en: "penury", ja: "極貧、貧困" },
+    { en: "perennial", ja: "長続きする、多年生の" },
+    { en: "perfidious", ja: "背信の、裏切りの" },
+    { en: "perfunctory", ja: "おざなりの、形式的な" },
+    { en: "permeable", ja: "浸透性のある、透過性の" },
+    { en: "pernicious", ja: "有害な、致命的な" },
+    { en: "perspicacious", ja: "洞察力のある、眼識のある" },
+    { en: "pervasive", ja: "蔓延する、行き渡る" },
+    { en: "phlegmatic", ja: "冷静な、無気力な" },
+    { en: "piety", ja: "信心深さ、敬虔" },
+    { en: "placate", ja: "なだめる、慰める" },
+    { en: "plasticity", ja: "可塑性、適応性" },
+    { en: "platitude", ja: "陳腐な言葉、月並みな文句" },
+    { en: "plethora", ja: "過多、過剰" },
+    { en: "plummet", ja: "急落する、真っ逆さまに落ちる" },
+    { en: "polarize", ja: "二極化する、分裂させる" },
+    { en: "polemical", ja: "論争の、議論を好む" },
+    { en: "porous", ja: "多孔性の、浸透性の" },
+    { en: "pragmatic", ja: "実用的な、現実的な" },
+    { en: "prate", ja: "ぺちゃくちゃしゃべる、無駄口を叩く" },
+    { en: "precarious", ja: "不安定な、危険な" },
+    { en: "precipitate", ja: "引き起こす、真っ逆さまに落とす" },
+    { en: "precursor", ja: "先駆者、前兆" },
+    { en: "presumptuous", ja: "出しゃばった、厚かましい" },
+    { en: "prevaricate", ja: "言葉を濁す、ごまかす" },
+    { en: "pristine", ja: "初期の、純粋な、汚れていない" },
+    { en: "probity", ja: "誠実さ、高潔" },
+    { en: "prodigal", ja: "浪費する、放蕩な" },
+    { en: "profound", ja: "深い、重大な" },
+    { en: "prohibitive", ja: "（価格が）法外な、禁止する" },
+    { en: "proliferate", ja: "激増する、増殖する" },
+    { en: "propensity", ja: "傾向、性質" },
+    { en: "propitiate", ja: "なだめる、機嫌をとる" },
+    { en: "propriety", ja: "礼儀正しさ、妥当性" },
+    { en: "proscribe", ja: "禁止する、追放する" },
+    { en: "pungent", ja: "鼻をつく、刺激性の" },
+    { en: "pusillanimous", ja: "臆病な、小心な" },
+    { en: "quack", ja: "やぶ医者、ペテン師" },
+    { en: "quaff", ja: "がぶ飲みする、痛飲する" },
+    { en: "quail", ja: "ひるむ、たじろぐ" },
+    { en: "qualified", ja: "条件付きの、制限された" },
+    { en: "qualm", ja: "気が咎めること、不安" },
+    { en: "quibble", ja: "屁理屈を言う、あいまいに言う" },
+    { en: "quiescent", ja: "静止した、無活動の" },
+    { en: "quixotic", ja: "空想的な、非現実的な" },
+    { en: "ramify", ja: "枝分かれする、分岐する" },
+    { en: "rarefied", ja: "（空気が）希薄な、難解な" },
+    { en: "rationale", ja: "根拠、理論的解釈" },
+    { en: "rebus", ja: "判じ絵、なぞなぞ" },
+    { en: "recalcitrant", ja: "反抗的な、手に負えない" },
+    { en: "recant", ja: "撤回する、取り消す" },
+    { en: "recluse", ja: "隠遁者、世捨て人" },
+    { en: "recondite", ja: "難解な、深遠な" },
+    { en: "redoubtable", ja: "恐るべき、強敬すべき" },
+    { en: "refractory", ja: "手に負えない、強情な" },
+    { en: "relegate", ja: "格下げする、左遷する" },
+    { en: "remonstrate", ja: "抗議する、忠告する" },
+    { en: "renege", ja: "約束を破る、背く" },
+    { en: "repartee", ja: "気の利いた即答、軽妙な応酬" },
+    { en: "repine", ja: "不平を言う、不満に思う" },
+    { en: "reprobate", ja: "堕落した人、ならず者" },
+    { en: "repudiate", ja: "拒絶する、否認する" },
+    { en: "rescind", ja: "無効にする、撤回する" },
+    { en: "resolution", ja: "決意、解決、解像度" },
+    { en: "resolve", ja: "解決する、決心する" },
+    { en: "reticent", ja: "無口な、控えめな" },
+    { en: "reverent", ja: "敬虔な、うやうやしい" },
+    { en: "riposte", ja: "しっぺ返し、素早い反撃" },
+    { en: "rococo", ja: "ロココ様式、装飾過多の" },
+    { en: "rubric", ja: "指示、規則、朱書" },
+    { en: "rue", ja: "後悔する、悲しむ" },
+    { en: "sagacious", ja: "賢明な、機敏な" },
+    { en: "salient", ja: "顕著な、目立った" },
+    { en: "salutary", ja: "有益な、ためになる" },
+    { en: "sanction", ja: "認可する、制裁を科す" },
+    { en: "sartorial", ja: "衣服の、仕立て屋の" },
+    { en: "satiate", ja: "十分に満足させる、飽きさせる" },
+    { en: "saturate", ja: "浸す、飽和させる" },
+    { en: "saturnine", ja: "陰気な、むっつりした" },
+    { en: "savor", ja: "味わう、風味を楽しむ" },
+    { en: "secrete", ja: "分泌する、隠す" },
+    { en: "sedulous", ja: "勤勉な、入念な" },
+    { en: "shard", ja: "破片、陶片" },
+    { en: "skeptic", ja: "懐疑論者、疑い深い人" },
+    { en: "solicitous", ja: "案じている、細心の注意を払う" },
+    { en: "soporific", ja: "催眠性の、眠気を誘う" },
+    { en: "specious", ja: "もっともらしい、見掛け倒しの" },
+    { en: "spectrum", ja: "範囲、連続体" },
+    { en: "sporadic", ja: "散発的な、時々起こる" },
+    { en: "stigma", ja: "汚名、不名誉" },
+    { en: "stint", ja: "制限する、切り詰める" },
+    { en: "stipulate", ja: "規定する、明記する" },
+    { en: "stolid", ja: "無感情な、鈍感な" },
+    { en: "striated", ja: "縞模様の、筋の入った" },
+    { en: "strut", ja: "気取って歩く、誇示する" },
+    { en: "subpoena", ja: "召喚状、召喚する" },
+    { en: "subside", ja: "静まる、低下する" },
+    { en: "substantiate", ja: "実証する、立証する" },
+    { en: "supersede", ja: "取って代わる、代わりとなる" },
+    { en: "supposition", ja: "推測、仮定" }
+    { en: "tacit", ja: "暗黙の、言葉に表さない" },
+    { en: "taciturn", ja: "無口な、口数の少ない" },
+    { en: "tangential", ja: "脱線する、わずかに関係のある" },
+    { en: "tantamount", ja: "同等の、等しい" },
+    { en: "tautology", ja: "同義語反復、類語反復" },
+    { en: "temerity", ja: "無鉄砲、向こう見ず" },
+    { en: "temperance", ja: "節制、自制" },
+    { en: "tenable", ja: "防衛できる、筋の通った" },
+    { en: "tenacious", ja: "粘り強い、固執する" },
+    { en: "tendentious", ja: "偏向した、特定の意図を持つ" },
+    { en: "tenuous", ja: "希薄な、根拠の薄弱な" },
+    { en: "terse", ja: "簡潔な、素っ気ない" },
+    { en: "timorous", ja: "臆病な、おどおどした" },
+    { en: "tirade", ja: "長広舌、非難の演説" },
+    { en: "torpid", ja: "無気力な、休眠中の" },
+    { en: "tortuous", ja: "ねじれ曲がった、回りくどい" },
+    { en: "tout", ja: "押し付けがましく勧誘する、褒めちぎる" },
+    { en: "tractable", ja: "扱いやすい、従順な" },
+    { en: "transgression", ja: "違反、犯罪" },
+    { en: "transient", ja: "一時的な、つかの間の" },
+    { en: "transitory", ja: "はかない、一時的な" },
+    { en: "trenchant", ja: "痛烈な、鋭い" },
+    { en: "trepidation", ja: "恐怖、不安" },
+    { en: "trite", ja: "陳腐な、ありふれた" },
+    { en: "truculent", ja: "攻撃的な、獰猛な" },
+    { en: "turgid", ja: "腫れ上がった、大げさな" },
+    { en: "turpitude", ja: "卑劣、邪悪" },
+    { en: "tyro", ja: "初心者、新米" },
+    { en: "ubiquitous", ja: "遍在する、どこにでもある" },
+    { en: "umbrage", ja: "腹立ち、不快感" },
+    { en: "unalloyed", ja: "混ぜ物のない、純粋な" },
+    { en: "unconscionable", ja: "非良心的な、不条理な" },
+    { en: "uncouth", ja: "粗野な、洗練されていない" },
+    { en: "unctuous", ja: "油こい、やたらと愛想のいい" },
+    { en: "undermine", ja: "密かに傷つける、土台を崩す" },
+    { en: "underscore", ja: "強調する、下線を引く" },
+    { en: "unfeigned", ja: "偽りのない、真実の" },
+    { en: "unimpeachable", ja: "申し分のない、疑いの余地のない" },
+    { en: "untenable", ja: "支持できない、防衛できない" },
+    { en: "untoward", ja: "都合の悪い、不適当な" },
+    { en: "upbraid", ja: "厳しく非難する、叱責する" },
+    { en: "urbane", ja: "都会風の、洗練された" },
+    { en: "usurp", ja: "強奪する、不法に手に入れる" },
+    { en: "vacillate", ja: "揺れ動く、ためらう" },
+    { en: "vacuous", ja: "うつろな、無意味な" },
+    { en: "vain", ja: "虚栄心の強い、無駄な" },
+    { en: "valedictory", ja: "告別の、卒業生代表の" },
+    { en: "vapid", ja: "生気のない、退屈な" },
+    { en: "variegated", ja: "まだらの、変化に富んだ" },
+    { en: "vaunt", ja: "誇張する、自慢する" },
+    { en: "vehement", ja: "激しい、熱烈な" },
+    { en: "venal", ja: "金で動く、買収できる" },
+    { en: "vendetta", ja: "血讐、根深い恨み" },
+    { en: "venerate", ja: "尊敬する、崇拝する" },
+    { en: "veracity", ja: "真実性、誠実さ" },
+    { en: "verbose", ja: "言葉数の多い、冗長な" },
+    { en: "verdant", ja: "新緑の、未熟な" },
+    { en: "verisimilitude", ja: "真実味、もっともらしさ" },
+    { en: "veritable", ja: "本物の、真の" },
+    { en: "vernal", ja: "春の、青春の" },
+    { en: "vestige", ja: "痕跡、面影" },
+    { en: "vexation", ja: "いらだち、悩みの種" },
+    { en: "viable", ja: "実行可能な、生存できる" },
+    { en: "vicarious", ja: "身代わりの、他人の経験を通して感じる" },
+    { en: "vicissitude", ja: "栄枯盛衰、変化" },
+    { en: "vigilance", ja: "警戒、用心" },
+    { en: "vilify", ja: "けなす、中傷する" },
+    { en: "vindicate", ja: "潔白を証明する、正当性を立証する" },
+    { en: "vindictive", ja: "復讐心の強い、執念深い" },
+    { en: "virtuoso", ja: "巨匠、名人" },
+    { en: "virulent", ja: "猛毒の、悪意に満ちた" },
+    { en: "viscous", ja: "粘性の、ねばねばする" },
+    { en: "vitiate", ja: "質を落とす、無効にする" },
+    { en: "vitriolic", ja: "痛烈な、辛辣な" },
+    { en: "vituperative", ja: "罵倒するような、口汚い" },
+    { en: "vivacious", ja: "活発な、陽気な" },
+    { en: "vociferous", ja: "大声で叫ぶ、騒々しい" },
+    { en: "volatile", ja: "揮発性の、変わりやすい" },
+    { en: "voluble", ja: "口達者な、おしゃべりな" },
+    { en: "voluminous", ja: "かさばる、著書が多い" },
+    { en: "voracious", ja: "貪欲な、食欲旺盛な" },
+    { en: "waft", ja: "漂う、漂わせる" },
+    { en: "waive", ja: "放棄する、撤回する" },
+    { en: "wallow", ja: "転げ回る、溺れる" },
+    { en: "wane", ja: "衰える、欠ける" },
+    { en: "wanton", ja: "無慈悲な、理不尽な、ふしだらな" },
+    { en: "wary", ja: "用心深い、慎重な" },
+    { en: "waver", ja: "揺れる、ためらう" },
+    { en: "welter", ja: "混乱、ごちゃ混ぜ" },
+    { en: "wheedle", ja: "甘言で誘う、巧みに手に入れる" },
+    { en: "whet", ja: "研ぐ、刺激する" },
+    { en: "whimsical", ja: "気まぐれな、風変わりな" },
+    { en: "wily", ja: "狡猾な、ずる賢い" },
+    { en: "winnow", ja: "ふるい分ける、選別する" },
+    { en: "winsome", ja: "愛嬌のある、魅力的な" },
+    { en: "wistful", ja: "物思いに沈んだ、名残惜しそうな" },
+    { en: "wither", ja: "しおれる、かすむ" },
+    { en: "wizened", ja: "しわくちゃの、干びた" },
+    { en: "wrath", ja: "激怒、憤り" },
+    { en: "xenophobia", ja: "外国人嫌悪" },
+    { en: "yearn", ja: "切望する、憧れる" },
+    { en: "yield", ja: "産出する、屈服する" },
+    { en: "yoke", ja: "くびき、支配" },
+    { en: "zany", ja: "滑稽な、風変わりな" },
+    { en: "zeal", ja: "熱意、熱中" },
+    { en: "zealot", ja: "狂信者、熱狂的な支持者" },
+    { en: "zenith", ja: "天頂、頂点" },
+    { en: "zephyr", ja: "そよ風、西風" }
+],
+  book5:[
+    { en: "agile", ja: "機敏な、変化に迅速に対応する" },
+    { en: "alignment", ja: "（部門間などの）方向性のすり合わせ、連携" },
+    { en: "attrition", ja: "（臨床試験における候補薬の）脱落、減少" },
+    { en: "bandwidth", ja: "（人や組織の）処理能力、対応する余裕" },
+    { en: "benchmark", ja: "指標、基準（競合他社との比較などで使用）" },
+    { en: "blockbuster", ja: "画期的な大ヒット薬（一般に年商10億ドル以上）" },
+    { en: "buy-in", ja: "（提案や計画に対する）賛同、受け入れ" },
+    { en: "cadence", ja: "（会議や報告の）頻度、ペース、リズム" },
+    { en: "compliance", ja: "法令順守（製薬業界では極めて厳格に求められる）" },
+    { en: "cross-functional", ja: "部門横断的な（R&D、薬事、コマーシャル等の連携）" },
+    { en: "divestiture", ja: "事業売却、子会社や部門の分離" },
+    { en: "efficacy", ja: "（臨床試験における）有効性、効能" },
+    { en: "exclusivity", ja: "（市場における）独占販売期間、排他的権利" },
+    { en: "expedite", ja: "（承認プロセスなどを）迅速化する、促進する" },
+    { en: "formulary", ja: "医薬品集、保険適用薬リスト（米国の市場アクセスで重要）" },
+    { en: "genericization", ja: "後発品化、ジェネリック参入による影響" },
+    { en: "go-to-market", ja: "市場参入（戦略）、製品を市場に投入するための" },
+    { en: "HCP (Healthcare Professional)", ja: "医療従事者（医師、看護師、薬剤師などの総称）" },
+    { en: "indication", ja: "適応症（薬が使用される対象となる疾患や症状）" },
+    { en: "in-license / out-license", ja: "（他社から技術や新薬候補を）導入する / 導出する" },
+    { en: "KOL (Key Opinion Leader)", ja: "影響力のある専門医、オピニオンリーダー" },
+    { en: "leverage", ja: "（既存のデータや資産を）最大限に活用する、テコ入れする" },
+    { en: "milestone", ja: "（開発や契約における）重要な節目、達成基準" },
+    { en: "mitigate", ja: "（リスクや副作用を）軽減する、和らげる" },
+    { en: "modality", ja: "創薬モダリティ、治療手段（低分子、抗体、遺伝子治療など）" },
+    { en: "off-label", ja: "適応外の（承認されていない目的や用法での使用）" },
+    { en: "onboard", ja: "（新入社員や新しいパートナーを）受け入れて教育する" },
+    { en: "paradigm shift", ja: "パラダイムシフト、劇的な価値観や治療法の変化" },
+    { en: "patent cliff", ja: "特許の崖（主力品の特許切れによる急激な収益減）" },
+    { en: "pharmacovigilance", ja: "ファーマコビジランス、医薬品安全性監視" },
+    { en: "pipeline", ja: "新薬のパイプライン、開発品のラインナップ" },
+    { en: "pivotal", ja: "極めて重要な（主に承認を左右する「Pivotal trial / 第III相試験」で使用）" },
+    { en: "PoC (Proof of Concept)", ja: "概念実証（新薬の有効性が人において初めて確認されること）" },
+    { en: "portfolio", ja: "製品ポートフォリオ、保有する全製品・開発品の群" },
+    { en: "post-marketing", ja: "製造販売後の（市販後調査などで使用）" },
+    { en: "prophylactic", ja: "予防の、予防的な（治療＝therapeuticとの対比）" },
+    { en: "ramp-up", ja: "（生産や活動の）急速な立ち上げ、増大" },
+    { en: "reimbursement", ja: "（公的・民間保険からの）保険償還、払い戻し" },
+    { en: "robust", ja: "堅牢な、強力で信頼できる（データやエビデンスに対して頻出）" },
+    { en: "siloed", ja: "縦割りの、他部門と連携できていない（ネガティブな文脈で使用）" },
+    { en: "SoC (Standard of Care)", ja: "標準治療（現在の医学で最善とされる一般的な治療法）" },
+    { en: "stakeholder", ja: "利害関係者（患者、医師、保険者、株主など）" },
+    { en: "stringent", ja: "（FDAなどの規制や審査が）非常に厳しい、厳格な" },
+    { en: "synergy", ja: "相乗効果（M&Aや部門連携の文脈で頻出）" },
+    { en: "therapeutic", ja: "治療の、治療に関する（予防＝prophylacticとの対比）" },
+    { en: "traction", ja: "（プロジェクトや製品の市場での）勢い、影響力の拡大" },
+    { en: "turnaround", ja: "（業績の）回復、方向転換、または所要時間" },
+    { en: "unmet medical need", ja: "アンメット・メディカル・ニーズ（いまだ満たされていない強い医療ニーズ）" },
+    { en: "value-based", ja: "価値に基づく（医療経済において、効果・価値に見合った価格設定などの文脈で）" },
+    { en: "white space", ja: "（市場や競合他社がまだ手をつけていない）空白領域" }
+    { en: "accretive", ja: "（M&Aなどが）利益を押し上げる、価値増大をもたらす" },
+    { en: "adjudication", ja: "（保険請求の）審査、裁定" },
+    { en: "advocacy", ja: "擁護、支援（Patient Advocacy = 患者支援活動や団体）" },
+    { en: "bottom-line", ja: "最終利益、純利益（財務報告などで頻出）" },
+    { en: "cannibalize", ja: "（新製品が自社の既存品の）売り上げを奪う、共食いする" },
+    { en: "capitation", ja: "人頭払い制度（医療機関に対し患者数に応じて定額を支払う方式）" },
+    { en: "co-pay", ja: "定額自己負担金（処方箋薬を受け取る際に患者が窓口で払う一定額）" },
+    { en: "coinsurance", ja: "共同保険（患者が医療費の一定「割合」を負担する制度）" },
+    { en: "compassionate use", ja: "人道的見地からの使用（重篤な患者への未承認薬の特例提供）" },
+    { en: "deductible", ja: "免責額（保険の支払いが開始される前に患者が全額自己負担すべき年間上限額）" },
+    { en: "due diligence", ja: "デューデリジェンス、資産査定（M&Aやライセンス契約前の詳細調査）" },
+    { en: "expanded access", ja: "拡大治験（compassionate useと同様、未承認薬へのアクセス制度）" },
+    { en: "fiduciary", ja: "受託者の、信認義務（役員が株主に対して負う忠実義務など）" },
+    { en: "formulary tier", ja: "医薬品集の階層（Tier 1がジェネリック等で最も患者負担が軽く、Tierが高いほど自己負担が増す）" },
+    { en: "harmonization", ja: "（国際的な規制やガイドラインの）調和、すり合わせ" },
+    { en: "HEOR", ja: "医療経済・アウトカム研究（Health Economics and Outcomes Research。薬の費用対効果を示すための必須部門）" },
+    { en: "ICER", ja: "増分費用対効果比（Incremental Cost-Effectiveness Ratio）、または米国の臨床経済評価研究所" },
+    { en: "inorganic growth", ja: "非連続的成長（自社の既存事業ではなく、M&Aや外部提携による成長）" },
+    { en: "kickback", ja: "不法な見返り（米国のAnti-Kickback Statute違反は製薬企業にとって致命的リスク）" },
+    { en: "Medicaid", ja: "メディケイド（米国の低所得者向け公的医療保険）" },
+    { en: "Medicare", ja: "メディケア（米国の高齢者・障害者向け公的医療保険）" },
+    { en: "orphan drug", ja: "オーファンドラッグ、希少疾病用医薬品（税制優遇や独占販売権が付与される）" },
+    { en: "out-of-pocket", ja: "患者の自己負担額（OOPと略され、OOPの上限設定が薬価戦略の鍵となる）" },
+    { en: "PBM", ja: "薬剤給付管理会社（Pharmacy Benefit Manager。米国特有の強力な中間業者で薬価交渉の要）" },
+    { en: "pharmacopeia", ja: "薬局方（医薬品の規格基準書）" },
+    { en: "predicate", ja: "先行する、根拠となる（predicate device/drug = 承認審査の基準となる先行品）" },
+    { en: "prior authorization", ja: "事前承認（高額な薬を処方する前に、医師が保険会社から得なければならない許可。PAと略す）" },
+    { en: "pro forma", ja: "試算の、見積もりの（M&A後や事業売却後の「仮にこうだった場合」の財務予測）" },
+    { en: "rebate", ja: "リベート、割戻金（メーカーからPBMや保険者に対して支払われる事実上の値引き。米国市場のブラックボックス）" },
+    { en: "REMS", ja: "リスク評価・軽減戦略（Risk Evaluation and Mitigation Strategy。FDAが求める厳格な安全管理手順）" },
+    { en: "spin-off", ja: "スピンオフ、部門の分離独立（特定事業を別会社として切り離すこと）" },
+    { en: "step therapy", ja: "ステップセラピー（保険会社が、まず安価な薬から試させ、効果がなかった場合にのみ高額な新薬を認める制度）" },
+    { en: "top-line", ja: "売上高（損益計算書の一番上にくることから。企業の成長力を示す）" },
+    { en: "utilization management", ja: "医療適正使用管理（UMと略す。保険者によるPrior authorizationやStep therapyなどのコスト抑制策の総称）" },
+    { en: "value proposition", ja: "価値提案（その薬が患者・医師・保険者に対して提供する独自の価値や費用対効果）" },
+    { en: "warning letter", ja: "警告書（FDAからの重大な規制違反の通知。株価に直結する）" }
+    { en: "alliance management", ja: "アライアンス・マネジメント（提携先企業との関係構築・事業運営管理）" },
+    { en: "amortization", ja: "（特許などの無形資産の）償却" },
+    { en: "asset", ja: "資産、開発候補品（製薬業界では新薬候補を単にassetと呼びます）" },
+    { en: "best-in-class", ja: "同効薬の中で最も優れた医薬品（薬効や安全性が最高クラスのもの）" },
+    { en: "bolt-on acquisition", ja: "ボルトオン買収（自社の既存事業を補完するための小〜中規模な企業買収）" },
+    { en: "CAGR", ja: "年平均成長率（Compound Annual Growth Rate。市場や売上の成長性を示す）" },
+    { en: "capex", ja: "資本的支出（Capital Expenditure。工場建設や大型設備投資など）" },
+    { en: "CDMO", ja: "医薬品開発製造受託機関（Contract Development and Manufacturing Organization）" },
+    { en: "COGS", ja: "売上原価（Cost of Goods Sold。バイオ医薬品は低分子に比べこれが高くなりがちです）" },
+    { en: "CVR", ja: "条件付価値請求権（Contingent Value Right。M&A時に、新薬が承認されたら追加で支払うというオプション契約）" },
+    { en: "DCF", ja: "割引キャッシュフロー（Discounted Cash Flow。将来の収益を現在の価値に割り引いて企業や薬の価値を算出する手法）" },
+    { en: "EBITDA", ja: "利払い・税引き・償却前利益（本業でのキャッシュを稼ぐ力を示す財務指標）" },
+    { en: "economies of scale", ja: "規模の経済（生産量が増えるほどコストが下がるメリット）" },
+    { en: "eNPV", ja: "リスク調整後正味現在価値（expected Net Present Value。製薬特有。各治験フェーズの成功確率[POS]を掛け合わせたNPV）" },
+    { en: "first-in-class", ja: "画期的新薬（全く新しい作用機序で、その疾患に対して最初に承認された薬）" },
+    { en: "franchise", ja: "フランチャイズ（特定の疾患領域における強力な製品群や事業基盤。例: Oncology franchise）" },
+    { en: "go/no-go decision", ja: "（次の治験フェーズへ）進むか中止するかの重大な意思決定" },
+    { en: "IRR", ja: "内部収益率（Internal Rate of Return。投資プロジェクトの利回りを示す指標）" },
+    { en: "LCM", ja: "ライフサイクルマネジメント（Life Cycle Management。適応追加や剤形変更による製品寿命と特許の延長戦略）" },
+    { en: "LoE", ja: "独占販売期間の満了、特許切れ（Loss of Exclusivity。この後にジェネリックが参入します）" },
+    { en: "me-too drug", ja: "類似新薬、後追い薬（すでに市場にある薬と似た作用機序を持つ薬）" },
+    { en: "milestone payment", ja: "マイルストーン支払い（ライセンス契約などで、開発の特定段階を達成した時に支払われる報奨金）" },
+    { en: "NPV", ja: "正味現在価値（Net Present Value。将来生み出されるキャッシュから投資額を引いたもの）" },
+    { en: "peak sales", ja: "ピーク時売上高（その新薬が特許期間中に達成できる単年での最大売上予測）" },
+    { en: "pipeline replenishment", ja: "パイプラインの補充（特許切れによる減収を補うため、新しい開発品を継続的に追加すること）" },
+    { en: "POS", ja: "成功確率（Probability of Success。治験が次のフェーズへ進める、または承認される確率）" },
+    { en: "royalty", ja: "ロイヤルティ（ライセンスアウトした薬の売上に応じて、一定のパーセンテージで受け取る特許使用料）" },
+    { en: "RWE", ja: "リアルワールドエビデンス（Real-World Evidence。治験外の実際の臨床現場や保険請求データから得られた根拠）" },
+    { en: "term sheet", ja: "条件概要書（M&Aやライセンス契約の本格的な交渉に入る前に合意する、主要条件をまとめた文書）" },
+    { en: "TPP", ja: "目標製品プロファイル（Target Product Profile。開発初期段階で設定する、その新薬が目指すべき理想の有効性や安全性の姿）" },
+    { en: "uptake", ja: "（新薬の市場での）浸透率、普及の勢い" },
+    { en: "valuation", ja: "企業価値評価、事業（パイプライン）価値評価" }
+]
+};
 /* ═══════════════════════════════════════════════════════════ */
 
 // ── State ──────────────────────────────────────────────────
-let words     = JSON.parse(JSON.stringify(WORD_LIST)); // working copy
+let sessionBooks  = JSON.parse(JSON.stringify(WORD_BOOKS)); // working copy of all books
+let selectedBook  = 'book1';
+let words         = sessionBooks[selectedBook];
+
 let questions = [];
 let current   = 0;
-let results   = []; // {word, type, correct, given}
+let results   = []; 
 let selectedCount = 10;
-let selectedType  = 'fill'; // 'fill' | 'choice' | 'mix'
+let selectedType  = 'fill'; 
 let answered  = false;
 
 // ── Helpers ────────────────────────────────────────────────
@@ -689,10 +1275,28 @@ function buildHint(word) {
 
 function getWrongOptions(correctIdx, count) {
   const others = words.filter((_, i) => i !== correctIdx);
+  // もし単語数が足りない場合は、空の選択肢を埋める
+  if (others.length < count) {
+      let blanks = new Array(count - others.length).fill("（選択肢なし）");
+      return shuffle(others).map(w => w.ja).concat(blanks);
+  }
   return shuffle(others).slice(0, count).map(w => w.ja);
 }
 
 // ── Home ───────────────────────────────────────────────────
+
+// 単語帳の切り替え
+document.getElementById('book-group').addEventListener('click', e => {
+  const btn = e.target.closest('[data-book]');
+  if (!btn) return;
+  document.querySelectorAll('#book-group .count-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  selectedBook = btn.dataset.book;
+  words = sessionBooks[selectedBook];
+  updateHomeCount();
+});
+
+// 問題の種類（出題形式）の切り替え
 document.getElementById('type-group').addEventListener('click', e => {
   const btn = e.target.closest('[data-type]');
   if (!btn) return;
@@ -701,6 +1305,7 @@ document.getElementById('type-group').addEventListener('click', e => {
   selectedType = btn.dataset.type;
 });
 
+// 出題数の切り替え
 document.querySelectorAll('[data-count]').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('[data-count]').forEach(b => b.classList.remove('selected'));
@@ -714,6 +1319,10 @@ document.getElementById('btn-edit').addEventListener('click', openEditor);
 
 // ── Editor ─────────────────────────────────────────────────
 function openEditor() {
+  // エディタのタイトルを選択中の単語帳に合わせて変更
+  const bookName = document.querySelector(`#book-group button[data-book="${selectedBook}"]`).textContent;
+  document.getElementById('editor-title').textContent = `${bookName}の編集`;
+  
   renderWordTable();
   showScreen('editor');
 }
@@ -756,18 +1365,20 @@ function esc(s) {
 document.getElementById('btn-add-word').addEventListener('click', () => {
   words.push({ en: '', ja: '' });
   renderWordTable();
-  // Focus last row
   const inputs = document.querySelectorAll('#word-tbody input');
   if (inputs.length) inputs[inputs.length - 2].focus();
 });
 
 document.getElementById('btn-save-editor').addEventListener('click', () => {
-  // Remove empty rows
   words = words.filter(w => w.en.trim() || w.ja.trim());
   if (words.length === 0) {
     toast('単語が1つもありません。');
     return;
   }
+  
+  // 編集結果を現在のセッションに反映
+  sessionBooks[selectedBook] = words;
+  
   updateHomeCount();
   showScreen('home');
   toast(`${words.length}語を保存しました`);
@@ -776,18 +1387,17 @@ document.getElementById('btn-save-editor').addEventListener('click', () => {
 // ── Quiz ───────────────────────────────────────────────────
 function startQuiz() {
   if (words.length < 4) {
-    toast('単語が最低4語必要です。');
+    toast('選択した単語帳には最低4語の登録が必要です。');
     return;
   }
   const count = Math.min(selectedCount, words.length);
   const pool  = shuffle(words).slice(0, count);
 
   questions = pool.map((w) => {
-    // Determine type based on selection
     let type;
     if (selectedType === 'fill')   type = 'fill';
     else if (selectedType === 'choice') type = 'choice';
-    else type = Math.random() < 0.5 ? 'fill' : 'choice'; // mix
+    else type = Math.random() < 0.5 ? 'fill' : 'choice'; 
 
     let opts = null;
     if (type === 'choice') {
@@ -827,7 +1437,6 @@ function renderQuestion() {
   answered = false;
 
   if (q.type === 'fill') {
-    // JP → EN
     badge.textContent  = '日 → 英';
     badge.className    = 'q-type-badge badge-ja';
     prompt.textContent = '日本語の意味に対応する英単語を入力してください';
@@ -843,7 +1452,6 @@ function renderQuestion() {
     inp.disabled = false;
     setTimeout(() => inp.focus(), 80);
   } else {
-    // EN → JP
     badge.textContent  = '英 → 日';
     badge.className    = 'q-type-badge badge-en';
     prompt.textContent = '英単語の意味として正しいものを選んでください';
